@@ -1,0 +1,25 @@
+# ユーザー個人設定（パスや定義が含まれるため）
+settings.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# 一時ファイル
+tmp-server.err
+tmp-server.log
+*.tmp
+
+# Claude Code
+.claude/
+
+# その他
+.DS_Store
+Thumbs.db

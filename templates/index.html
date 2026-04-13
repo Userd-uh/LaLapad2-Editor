@@ -1,0 +1,3520 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>LaLapad Gen2 Keymap Editor</title>
+<style>
+:root{
+  --bg:#070b11;--bg2:#101722;--bg3:#172131;
+  --accent:#5eead4;--a2:#38bdf8;--a3:#0f766e;
+  --text:#ecf5ff;--dim:#91a4ba;--muted:#5c7086;
+  --bdr:#1e2c3d;--bdr2:#2a3d52;
+  --kbg:#152131;--khov:#213247;
+  --ok:#34d399;--err:#f87171;--warn:#fbbf24;
+  --kmo:#132e46;--kmt:#38280f;--ksys:#3a1622;
+  --kbt:#103326;--kms:#241537;--kdyn:#213510;--kcu:#18293b;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;
+  font-size:13px;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+.d-none{display:none!important;}
+
+header{background:linear-gradient(180deg,#101a27,#0e1621);border-bottom:1px solid rgba(94,234,212,.35);padding:6px 14px;
+  display:flex;align-items:center;gap:8px;flex-shrink:0;}
+header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;letter-spacing:.02em;}
+.file-status{flex:1;font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.btn{padding:5px 11px;border:1px solid var(--bdr2);border-radius:4px;background:var(--bg3);
+  color:var(--text);cursor:pointer;font-size:12px;white-space:nowrap;transition:background .12s;}
+.btn:hover{background:var(--khov);}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#06261f;}
+.btn.primary:hover{background:#7df4df;}
+.btn.blue{background:var(--a3);border-color:var(--a3);}
+.btn.blue:hover{background:#129285;}
+.btn.sm{padding:3px 8px;font-size:11px;}
+.unsaved{color:var(--warn);font-size:18px;line-height:1;}
+
+.main-tabs{background:var(--bg2);display:flex;padding:0 14px;border-bottom:1px solid var(--bdr);flex-shrink:0;}
+.main-tab{padding:6px 16px;cursor:pointer;color:var(--dim);border-bottom:2px solid transparent;font-size:12px;}
+.main-tab.active{color:var(--text);border-bottom-color:var(--accent);}
+.main-tab:hover{color:var(--text);}
+.tab-pane{display:none;flex:1;flex-direction:column;overflow:hidden;min-height:0;}
+.tab-pane.active{display:flex;}
+
+.layer-bar{background:var(--bg2);padding:5px 14px;display:flex;gap:5px;align-items:center;
+  flex-shrink:0;border-bottom:1px solid var(--bdr);flex-wrap:wrap;}
+.lbtn{padding:3px 11px;border-radius:4px;border:1px solid var(--bdr2);background:var(--bg3);
+  color:var(--dim);cursor:pointer;font-size:11px;}
+.lbtn.active{background:var(--a2);border-color:var(--a2);color:#fff;font-weight:700;
+  box-shadow:0 0 0 2px rgba(56,189,248,.28);}
+.lbtn:hover:not(.active){color:var(--text);}
+
+.split{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;}
+.kb-area{flex:0 1 auto;overflow:auto;display:flex;justify-content:center;align-items:flex-start;padding:14px;min-height:0;}
+.no-data-box{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  width:100%;height:100%;gap:10px;color:var(--dim);}
+.no-data-box h2{color:var(--text);font-size:17px;}
+
+/* Keys */
+.keyboard{position:relative;flex-shrink:0;}
+.key{position:absolute;border-radius:4px;border:1px solid var(--bdr2);background:var(--kbg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;
+  overflow:hidden;user-select:none;font-size:10px;text-align:center;line-height:1.25;
+  transition:border-color .1s,background .1s;}
+.key:hover{background:var(--khov);border-color:var(--a2);}
+.key.drag-over{background:#1d4ed8!important;border-color:#60a5fa!important;transform:scale(1.06);}
+/* &trans: 騾壼ｸｸ繧ｭ繝ｼ縺ｨ蜷後§閭梧勹濶ｲ縲≫命繧定埋縺剰｡ｨ遉ｺ */
+.key.k-trans{background:var(--kbg);color:var(--text);border-style:dashed;}
+/* &none: 證励＞縲∬埋縺・ｵ､ */
+.key.k-none{background:var(--kbg);color:transparent;border-color:var(--bdr2);}
+.key.k-mo{background:var(--kmo);color:#7dd3fc;}
+.key.k-mt{background:var(--kmt);color:#fbbf24;}
+.key.k-sys{background:var(--ksys);color:#f9a8d4;}
+.key.k-bt{background:var(--kbt);color:#6ee7b7;}
+.key.k-mouse{background:var(--kms);color:#c4b5fd;}
+.key.k-dyn{background:var(--kdyn);color:#a3e635;}
+.key.k-custom{background:var(--kcu);color:#93c5fd;}
+.key.k-mod{background:#1e1e0a;color:#fde68a;border-color:#5a5000;}
+.key-lbl{pointer-events:none;}
+.key-sub{font-size:8px;color:inherit;pointer-events:none;margin-top:1px;}
+
+/* Palette */
+.palette{flex:1;background:var(--bg2);border-top:2px solid var(--bdr);display:flex;
+  flex-direction:column;height:100%;min-height:0;max-height:none;overflow:hidden;}
+.palette.contextual{border-top-color:var(--a2);}
+.pal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:8px 10px;border-bottom:1px solid var(--bdr);background:rgba(15,23,42,.55);}
+.pal-head-main{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.pal-title{font-size:12px;color:var(--text);font-weight:600;}
+.pal-note{font-size:10px;color:var(--muted);line-height:1.4;}
+.pal-tabs{display:flex;padding:3px 7px 0;border-bottom:1px solid var(--bdr);overflow-x:auto;
+  overflow-y:hidden;flex-shrink:0;gap:1px;scrollbar-width:none;scroll-behavior:smooth;}
+.pal-tabs::-webkit-scrollbar{display:none;}
+.pal-tab{padding:4px 10px;cursor:pointer;color:var(--dim);border-bottom:2px solid transparent;font-size:12px;white-space:nowrap;flex:0 0 auto;}
+.pal-tab.active{color:var(--text);border-bottom-color:var(--a2);}
+.pal-tab:hover{color:var(--text);}
+.pal-qwerty{flex:1;overflow:visible;padding:10px 12px;display:flex;flex-direction:column;gap:6px;align-items:flex-start;width:max-content;margin:0 auto;}
+#pal-body.pal-body-qwerty{overflow-x:auto;overflow-y:auto;}
+.pal-row{display:flex;gap:3px;align-items:center;}
+.pal-row.r0{margin-left:0px;} .pal-row.r1{margin-left:8px;} .pal-row.r2{margin-left:18px;} .pal-row.r3{margin-left:30px;} .pal-row.r4{margin-left:42px;} .pal-row.r5{margin-left:56px;} .pal-row.r6{margin-left:0px;margin-top:14px;}
+.pal-gap{flex:0 0 auto;height:1px;}
+.pal-gap.g1{width:14px;} .pal-gap.g2{width:28px;} .pal-gap.g3{width:42px;} .pal-gap.g4{width:56px;}
+/* Quantum grouped */
+.pal-layer{flex:1;overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;gap:8px;}
+.pal-layer-row{display:flex;flex-wrap:wrap;gap:4px;align-items:flex-start;}
+.pal-quantum{flex:1;overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;gap:10px;}
+.pal-numpad{flex:1;overflow:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px;align-items:flex-start;}
+.pal-numpad-row{display:flex;gap:4px;align-items:center;}
+.qgrp{display:flex;flex-direction:column;gap:6px;align-items:stretch;}
+.qgrp-label{font-size:10px;color:var(--a2);line-height:1.4;letter-spacing:.03em;text-transform:uppercase;}
+.qgrp-keys{display:flex;flex-wrap:wrap;gap:3px;}
+/* Horizontal scroll */
+.pal-scroll{flex:1;display:flex;gap:4px;padding:8px 10px;overflow-x:auto;overflow-y:hidden;align-items:center;}
+.pal-wrap{flex:1;display:flex;flex-wrap:wrap;gap:4px;padding:8px 10px;overflow-y:auto;align-content:flex-start;}
+.pk{min-width:42px;height:38px;border-radius:4px;border:1px solid var(--bdr2);background:var(--kbg);
+  display:flex;align-items:center;justify-content:center;cursor:grab;font-size:11px;
+  text-align:center;padding:2px 5px;flex-shrink:0;user-select:none;white-space:pre-line;line-height:1.2;}
+.pk:hover{background:var(--khov);border-color:var(--a2);}
+.pk:active{cursor:grabbing;}
+.pk.k-trans{background:var(--kbg);color:var(--text);border-style:dashed;}
+.pk.k-none{background:var(--kbg);color:transparent;border-color:var(--bdr2);}
+.pk.k-custom{background:var(--kcu);color:#93c5fd;}
+.pk.k-mt{background:#2a1800;color:#fbbf24;border-color:#5a3800;}
+.pk.k-mo{background:var(--kmo);color:#7dd3fc;}
+.pk.k-sys{background:var(--ksys);color:#f9a8d4;}
+.pk.k-bt{background:var(--kbt);color:#6ee7b7;}
+.pk.k-dyn{background:var(--kdyn);color:#a3e635;}
+.pk.k-mouse{background:var(--kms);color:#c4b5fd;}
+.pk.k-mod{background:#1e1e0a;color:#fde68a;border-color:#5a5000;}
+.pk.k-disabled{opacity:.45;cursor:default;border-style:dashed;}
+.pk.k-disabled:hover{background:var(--kbg);border-color:var(--bdr2);}
+.pk.w15{min-width:55px;} .pk.w2{min-width:76px;} .pk.w25{min-width:95px;} .pk.w6{min-width:200px;}
+.pk.w11{min-width:36px;} .pk.w13{min-width:48px;} .pk.w17{min-width:64px;} .pk.w3{min-width:114px;}
+.pk.w_np0{min-width:99px;}
+.pk.w_bksp{min-width:72px;} .pk.w_enter{min-width:65px;} .pk.w_lrsh{min-width:87px;}
+.pk.w_tab{min-width:72px;margin-left:-8px;} .pk.w_caps{min-width:94px;margin-left:-18px;} .pk.w_lshift{min-width:117px;margin-left:-30px;} .pk.w_lctrl{min-width:76px;margin-left:-56px;} .pk.w_space{min-width:244px;}
+
+/* Settings */
+.sub-bar{background:var(--bg2);padding:5px 14px;display:flex;gap:6px;align-items:center;
+  flex-shrink:0;border-bottom:1px solid var(--bdr);}
+.tp-btn{padding:3px 12px;border-radius:4px;border:1px solid var(--bdr2);background:var(--bg3);
+  color:var(--dim);cursor:pointer;font-size:12px;}
+.tp-btn.active{background:var(--a3);border-color:var(--a3);color:#fff;}
+.tp-btn:hover:not(.active){color:var(--text);}
+.settings-grid{flex:1;overflow-y:auto;padding:10px 14px;
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;align-content:start;}
+.sect{background:var(--bg2);border:1px solid var(--bdr);border-radius:5px;padding:10px;}
+.sect-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;
+  padding-bottom:5px;border-bottom:1px solid var(--bdr);}
+.sect-hdr h3{font-size:10px;color:var(--a2);text-transform:uppercase;letter-spacing:.05em;}
+.srow{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px;}
+.srow:last-child{margin-bottom:0;}
+.slabel{font-size:11px;color:var(--dim);flex:1;}
+.slabel.has-tip{cursor:help;border-bottom:1px dotted rgba(148,163,184,.45);}
+.snum{width:78px;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);
+  padding:3px 5px;border-radius:3px;font-size:11px;text-align:right;}
+.snum:focus{outline:none;border-color:var(--a2);}
+.toggle{position:relative;width:32px;height:17px;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;}
+.tsl{position:absolute;inset:0;background:#3b3b3b;border-radius:9px;cursor:pointer;transition:background .2s;}
+.tsl::before{content:'';position:absolute;width:11px;height:11px;left:3px;top:3px;
+  background:#fff;border-radius:50%;transition:transform .2s;}
+.toggle input:checked+.tsl{background:var(--a2);}
+.toggle input:checked+.tsl::before{transform:translateX(15px);}
+.rot-grp{display:flex;gap:3px;}
+.rot-btn{padding:2px 7px;border-radius:3px;border:1px solid var(--bdr2);background:var(--bg3);
+  color:var(--dim);cursor:pointer;font-size:10px;}
+.rot-btn.active{background:var(--a2);color:#fff;border-color:var(--a2);}
+
+/* Gesture section in trackpad tab */
+.gest-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:5px;}
+.gest-item{display:flex;align-items:center;gap:6px;background:var(--bg3);border-radius:4px;
+  padding:5px 8px;cursor:pointer;border:1px solid transparent;transition:border-color .1s;}
+.gest-item:hover{border-color:var(--a2);}
+.gest-item.pal-target{border-color:#60a5fa;background:#122033;box-shadow:0 0 0 1px rgba(96,165,250,.3) inset;}
+.gest-label{font-size:10px;color:var(--dim);flex:1;}
+.gest-key{min-width:50px;height:28px;border-radius:3px;border:1px solid var(--bdr2);
+  background:var(--kbg);display:flex;align-items:center;justify-content:center;
+  font-size:10px;white-space:pre-line;text-align:center;line-height:1.2;flex-shrink:0;}
+.gest-key.k-trans{color:var(--text);border-style:dashed;}
+
+/* TapDance tab */
+.td-layout{display:flex;flex:1;min-height:0;overflow:hidden;}
+.td-list-panel{width:120px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--bdr);padding:4px 0;}
+.td-list-item{padding:5px 10px;cursor:pointer;border-left:3px solid transparent;display:flex;flex-direction:column;gap:2px;}
+.td-list-item:hover{background:var(--khov);}
+.td-list-item.active{background:var(--bg3);border-left-color:var(--accent);}
+.td-list-label{font-size:12px;color:var(--a2);font-weight:700;}
+.td-list-summary{font-size:10px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px;}
+.td-detail-panel{flex:1;overflow-y:auto;padding:10px 14px;min-width:0;display:flex;flex-direction:column;gap:10px;}
+.td-list{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:10px;}
+.td-card{background:var(--bg2);border:1px solid var(--bdr);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:10px;}
+.td-card-hdr{display:flex;align-items:center;gap:8px;}
+.td-card-name{color:var(--a2);font-weight:700;font-size:13px;letter-spacing:.03em;}
+.td-card-raw{margin-left:auto;font-family:monospace;color:var(--ok);font-size:10px;}
+.td-state-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.td-state{display:flex;flex-direction:column;gap:4px;}
+.td-state-label{font-size:10px;color:var(--a2);text-transform:uppercase;letter-spacing:.04em;}
+.td-state-key{min-height:52px;border-radius:5px;border:1px solid var(--bdr2);background:var(--kbg);padding:6px 8px;
+  display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;font-size:11px;line-height:1.25;white-space:pre-line;}
+.td-state-key:hover{background:var(--khov);border-color:var(--a2);}
+.td-state-key.pal-target{background:#122033;box-shadow:inset 0 0 0 1px rgba(96,165,250,.45);}
+.td-state-key.empty{color:var(--muted);border-style:dashed;}
+.td-state-code{font-size:10px;color:var(--dim);}
+.td-card-ft{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.td-term{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--dim);}
+.td-term input{width:72px;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);padding:3px 5px;border-radius:3px;font-size:11px;text-align:right;}
+.td-term input:focus{outline:none;border-color:var(--a2);}
+@media (max-width: 900px){
+  .td-state-grid{grid-template-columns:1fr 1fr;}
+}
+/* Combo card layout */
+.combo-list{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:8px;}
+.combo-card{background:var(--bg2);border:1px solid var(--bdr);border-radius:6px;padding:10px 12px;}
+.combo-card-hdr{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.combo-card-hdr input{flex:1;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);
+  padding:4px 6px;border-radius:3px;font-size:12px;font-weight:600;}
+.combo-card-hdr input:focus{outline:none;border-color:var(--a2);}
+.combo-field{display:grid;grid-template-columns:72px 1fr;gap:6px;align-items:start;margin-bottom:5px;}
+.combo-field:last-child{margin-bottom:0;}
+.combo-field-label{font-size:10px;color:var(--a2);text-transform:uppercase;letter-spacing:.04em;
+  padding-top:4px;}
+.combo-pos-wrap{display:flex;flex-wrap:wrap;align-items:center;gap:4px;}
+.combo-pos-chip{background:var(--bg3);border:1px solid var(--bdr2);border-radius:3px;
+  padding:2px 6px;font-size:11px;color:var(--text);}
+.combo-pick-btn{padding:2px 8px;border-radius:3px;border:1px solid var(--a3);
+  background:rgba(15,118,110,.15);color:var(--accent);cursor:pointer;font-size:10px;}
+.combo-pick-btn:hover{background:var(--a3);color:#fff;}
+.combo-binding-btn{min-width:80px;height:32px;border-radius:3px;border:1px solid var(--bdr2);
+  background:var(--kbg);cursor:pointer;font-size:11px;padding:0 8px;text-align:left;
+  display:flex;align-items:center;color:var(--text);}
+.combo-binding-btn:hover{background:var(--khov);border-color:var(--a2);}
+.combo-binding-btn.pal-target{box-shadow:0 0 0 1px rgba(96,165,250,.55),0 0 0 3px rgba(37,99,235,.22);}
+.combo-layer-wrap{display:flex;flex-wrap:wrap;gap:3px;align-items:center;}
+.combo-layer-btn{padding:2px 7px;border-radius:3px;border:1px solid var(--bdr2);background:var(--bg3);
+  color:var(--dim);cursor:pointer;font-size:10px;}
+.combo-layer-btn.active{background:var(--a3);border-color:var(--a3);color:#fff;}
+.combo-layer-btn:hover:not(.active){color:var(--text);}
+.combo-timeout-wrap{display:flex;align-items:center;gap:5px;}
+.combo-timeout-wrap input{width:72px;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);
+  padding:3px 5px;border-radius:3px;font-size:11px;text-align:right;}
+.combo-timeout-wrap input:focus{outline:none;border-color:var(--a2);}
+/* Combo keyboard picker */
+.combo-kb-key{position:absolute;border-radius:3px;border:1px solid var(--bdr2);background:var(--kbg);
+  cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:8px;text-align:center;user-select:none;transition:background .1s,border-color .1s;
+  overflow:hidden;line-height:1.2;}
+.combo-kb-key:hover{background:var(--khov);border-color:var(--a2);}
+.combo-kb-key.ck-selected{background:var(--a3)!important;border-color:var(--accent)!important;color:#fff!important;}
+.combo-kb-key .ck-idx{font-size:7px;color:rgba(255,255,255,.5);margin-top:1px;}
+
+/* MT drop zones in modal */
+.mt-drop-zone{min-height:52px;border:2px dashed var(--bdr2);border-radius:5px;background:var(--bg);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  transition:border-color .1s,background .1s;font-size:16px;margin-bottom:4px;}
+.mt-drop-zone:hover{border-color:var(--a2);}
+.mt-drop-zone.drag-over{border-color:var(--a3)!important;background:#1d3a5f!important;}
+.mt-drop-zone.has-value{border-color:#5a3800;background:var(--kmt);}
+.mt-drop-zone.pal-target{border-color:#60a5fa;background:#122033;}
+.mt-zone-text{font-size:11px;color:var(--dim);}
+
+/* Key picker popup */
+.key-picker{position:fixed;background:var(--bg2);border:1px solid var(--bdr2);border-radius:7px;
+  padding:10px;width:320px;max-height:320px;overflow-y:auto;z-index:3000;
+  box-shadow:0 4px 24px rgba(0,0,0,.7);}
+.binding-picker{width:520px;max-height:420px;}
+.key-picker h4{font-size:11px;color:var(--dim);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;}
+.kp-search{width:100%;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);
+  padding:4px 7px;border-radius:3px;font-size:11px;margin-bottom:6px;}
+.kp-search:focus{outline:none;border-color:var(--a2);}
+.kp-grid{display:flex;flex-wrap:wrap;gap:3px;}
+.kp-key{min-width:36px;height:30px;border-radius:3px;border:1px solid var(--bdr2);
+  background:var(--kbg);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:10px;padding:2px 4px;white-space:pre-line;line-height:1.2;}
+.kp-key:hover{background:var(--khov);border-color:var(--a2);}
+.kp-key.km{background:var(--kmt);color:#fbbf24;border-color:#5a3800;}
+.picker-tabs{display:flex;gap:2px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px;border-bottom:1px solid var(--bdr);}
+.picker-tab{padding:4px 8px;border-radius:4px 4px 0 0;color:var(--dim);cursor:pointer;font-size:11px;border-bottom:2px solid transparent;white-space:nowrap;}
+.picker-tab.active{color:var(--text);border-bottom-color:var(--accent);}
+.picker-body{display:flex;flex-direction:column;gap:8px;}
+
+/* Modals */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;
+  justify-content:center;z-index:1000;}
+.overlay.open{display:flex;}
+.modal{background:var(--bg2);border:1px solid var(--bdr2);border-radius:8px;padding:18px;
+  min-width:400px;max-width:94vw;max-height:88vh;overflow-y:auto;}
+.modal h2{font-size:14px;margin-bottom:12px;color:var(--accent);}
+.frow{margin-bottom:9px;}
+.frow label{display:block;font-size:11px;color:var(--dim);margin-bottom:3px;}
+.frow input,.frow select{width:100%;background:var(--bg);border:1px solid var(--bdr2);
+  color:var(--text);padding:7px 8px;border-radius:4px;font-size:12px;}
+.frow input:focus{outline:none;border-color:var(--a2);}
+.modal-btns{display:flex;gap:7px;justify-content:flex-end;margin-top:10px;}
+.path-row{display:flex;gap:6px;} .path-row input{flex:1;}
+.found-files{font-size:11px;margin-top:8px;display:grid;gap:3px;}
+.ff{display:flex;gap:5px;align-items:baseline;color:var(--dim);}
+.ff.ok{color:var(--ok);}.ff.ng{color:var(--err);}
+.folder-history{margin-top:6px;display:flex;flex-direction:column;gap:2px;}
+.folder-history-title{font-size:10px;color:var(--muted);margin-bottom:2px;}
+.folder-history-item{font-size:11px;color:var(--a2);cursor:pointer;padding:2px 6px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px;}
+.folder-history-item:hover{background:var(--bg3);color:var(--text);}
+.folder-history-path{flex:1;overflow:hidden;text-overflow:ellipsis;}
+.folder-history-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.folder-history-count{font-size:10px;color:var(--dim);flex-shrink:0;}
+.folder-history-del{width:22px;height:22px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--dim);cursor:pointer;border-radius:3px;font-size:13px;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;}
+.folder-history-del:hover{background:#3b1212;color:#f87171;border-color:#7f1d1d;}
+.quick-grid{display:flex;flex-wrap:wrap;gap:3px;max-height:110px;overflow-y:auto;margin-bottom:9px;}
+.qk{padding:3px 6px;border-radius:3px;border:1px solid var(--bdr2);background:var(--kbg);
+  cursor:pointer;font-size:10px;white-space:pre-line;text-align:center;line-height:1.2;}
+.qk:hover{background:var(--khov);border-color:var(--a2);}
+.qk.k-custom{background:var(--kcu);color:#93c5fd;}
+.qk.k-mt{background:#2a1800;color:#fbbf24;}
+.tab-palette-slot{display:none;min-height:0;}
+.tab-palette-slot.active{display:flex;flex-direction:column;flex:0 0 var(--palette-slot-size,clamp(240px,44vh,400px));height:var(--palette-slot-size,clamp(240px,44vh,400px));min-height:240px;max-height:min(72vh,960px);border-top:1px solid var(--bdr);}
+#pal-body{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+.status-bar{background:var(--bg2);border-top:1px solid var(--bdr);padding:3px 14px;
+  font-size:10px;color:var(--dim);display:flex;gap:14px;flex-shrink:0;}
+.status-code{font-family:Consolas,'Courier New',monospace;color:var(--text);}
+.s-ok{color:var(--ok);}.s-err{color:var(--err);}.s-warn{color:var(--warn);}
+.pal-target{box-shadow:0 0 0 1px rgba(96,165,250,.55), 0 0 0 3px rgba(37,99,235,.22);}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:#4b5563;border-radius:3px;}
+
+/* Macro */
+--kmacro:#1a2c1a;
+.key.k-macro{background:var(--kmacro);color:#86efac;}
+.pk.k-macro{background:var(--kmacro);color:#86efac;}
+.macro-layout{display:flex;flex:1;min-height:0;overflow:hidden;}
+.macro-list-panel{width:160px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--bdr);padding:4px 0;}
+.macro-list-item{padding:5px 10px;cursor:pointer;border-left:3px solid transparent;display:flex;flex-direction:column;gap:1px;}
+.macro-list-item:hover{background:var(--khov);}
+.macro-list-item.active{background:var(--bg3);border-left-color:var(--accent);}
+.macro-list-label{font-size:12px;color:var(--a2);font-weight:700;}
+.macro-list-name{font-size:10px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.macro-editor-panel{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:8px;min-width:0;}
+.macro-name-row{display:flex;align-items:center;gap:8px;}
+.macro-name-row label{font-size:11px;color:var(--dim);flex-shrink:0;white-space:nowrap;}
+.macro-name-row input{flex:1;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);padding:4px 7px;border-radius:3px;font-size:12px;}
+.macro-name-row input:focus{outline:none;border-color:var(--a2);}
+.macro-text-bar{display:flex;align-items:center;gap:5px;padding:6px 8px;background:var(--bg2);border:1px solid var(--bdr);border-radius:4px;flex-wrap:wrap;}
+.macro-text-bar label{font-size:10px;color:var(--a2);text-transform:uppercase;letter-spacing:.04em;flex-shrink:0;}
+.macro-text-bar input{flex:1;min-width:120px;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);padding:3px 6px;border-radius:3px;font-size:11px;}
+.macro-text-bar input:focus{outline:none;border-color:var(--a2);}
+.macro-step-list{display:flex;flex-direction:column;gap:4px;}
+.macro-step{display:flex;align-items:center;gap:6px;padding:5px 8px;background:var(--bg2);border:1px solid var(--bdr);border-radius:4px;min-height:52px;transition:opacity .15s,box-shadow .15s;position:relative;}
+.macro-step.step-paired{border-left:3px solid var(--pair-color,#38bdf8);}
+.macro-step.dragging{opacity:.4;}
+.macro-step.drag-target-above{box-shadow:0 -2px 0 var(--accent);}
+.macro-step.drag-target-below{box-shadow:0 2px 0 var(--accent);}
+.macro-step-drag{cursor:grab;color:var(--dim);font-size:14px;padding:0 2px;flex-shrink:0;user-select:none;line-height:1;}
+.macro-step-drag:active{cursor:grabbing;}
+.macro-step-num{font-size:10px;color:var(--muted);width:16px;text-align:center;flex-shrink:0;}
+.macro-step-type-sel{background:var(--bg);border:1px solid var(--bdr2);color:var(--text);padding:3px 4px;border-radius:3px;font-size:11px;flex-shrink:0;height:28px;}
+.macro-step-type-sel:focus{outline:none;border-color:var(--a2);}
+.macro-step-key-slot{min-width:52px;height:42px;border-radius:4px;border:1px solid var(--bdr2);background:var(--kbg);color:var(--text);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px;text-align:center;padding:2px 6px;user-select:none;white-space:pre-line;line-height:1.2;transition:background .1s,border-color .1s;flex:1;max-width:140px;}
+.macro-step-key-slot:hover{background:var(--khov);border-color:var(--a2);}
+.macro-step-key-slot.k-macro{background:var(--kmacro);color:#86efac;}
+.macro-step-ms{display:flex;align-items:center;gap:4px;}
+.macro-step-ms input{width:80px;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);padding:4px 6px;border-radius:3px;font-size:12px;text-align:right;height:32px;}
+.macro-step-ms input:focus{outline:none;border-color:var(--a2);}
+.macro-step-ms span{font-size:11px;color:var(--dim);}
+.macro-step-text{display:flex;align-items:center;gap:4px;flex:1;}
+.macro-step-text input{flex:1;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);padding:4px 6px;border-radius:3px;font-size:11px;height:32px;}
+.macro-step-text input:focus{outline:none;border-color:var(--a2);}
+.macro-step-pause{font-size:11px;color:var(--dim);font-style:italic;flex:1;}
+.macro-step-del{width:24px;height:24px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--dim);cursor:pointer;border-radius:3px;font-size:13px;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;margin-left:auto;}
+.macro-step-del:hover{background:#3b1212;color:#f87171;border-color:#7f1d1d;}
+.macro-step-expand-btn{padding:3px 7px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--dim);cursor:pointer;border-radius:3px;font-size:10px;white-space:nowrap;flex-shrink:0;}
+.macro-step-expand-btn:hover{background:var(--khov);color:var(--text);}
+.macro-step.step-warn{border-color:#b45309;background:#1c1208;}
+.macro-step-pair-badge{font-size:10px;line-height:1;padding:4px 7px;border-radius:999px;border:1px solid var(--pair-color,#38bdf8);color:var(--pair-color,#38bdf8);background:rgba(15,23,42,.35);white-space:nowrap;flex-shrink:0;}
+.macro-step-link-btn{padding:3px 7px;border:1px dashed #b45309;background:#2a1a08;color:#f59e0b;cursor:pointer;border-radius:999px;font-size:10px;white-space:nowrap;flex-shrink:0;}
+.macro-step-link-btn:hover{background:#3b250b;color:#fbbf24;}
+.macro-step-text-warn{font-size:10px;color:#f59e0b;padding:2px 0 0 0;width:100%;}
+.macro-step-warn-msg{font-size:10px;color:#f59e0b;padding:2px 0 0 0;width:100%;}
+.macro-step-text-preview{display:flex;flex-wrap:wrap;gap:3px;padding:5px 2px 2px 2px;width:100%;border-top:1px solid var(--bdr);margin-top:4px;}
+.macro-tap-badge{background:var(--kbg);border:1px solid var(--bdr2);border-radius:3px;padding:1px 5px;font-size:10px;font-family:monospace;color:var(--text);}
+.macro-add-bar{display:flex;gap:6px;flex-wrap:wrap;padding-top:4px;align-items:center;}
+.macro-add-bar select{background:var(--bg);border:1px solid var(--bdr2);color:var(--text);padding:4px 6px;border-radius:3px;font-size:11px;height:30px;}
+.macro-add-bar button{padding:4px 10px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--text);cursor:pointer;border-radius:3px;font-size:11px;height:30px;}
+.macro-add-bar button:hover{background:var(--accent);border-color:var(--accent);color:#fff;}
+.macro-binding-preview{font-size:10px;color:var(--ok);font-family:monospace;padding:4px 6px;background:var(--bg);border-radius:3px;border:1px solid var(--bdr);word-break:break-all;}
+.macro-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto;}
+.macro-restore-select{min-width:260px;max-width:min(42vw,520px);background:var(--bg);border:1px solid var(--bdr2);color:var(--text);padding:4px 6px;border-radius:3px;font-size:11px;height:30px;}
+.macro-restore-select:focus{outline:none;border-color:var(--a2);}
+.macro-current-path{font-size:10px;color:var(--muted);max-width:min(32vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>LaLapad Gen2 Editor</h1>
+  <span class="file-status" id="file-status">No file loaded</span>
+  <button class="btn" onclick="openSettings()">Settings</button>
+  <button class="btn primary" id="save-btn" onclick="saveAll()" title="Ctrl+S">Save All</button>
+  <span class="unsaved d-none" id="unsaved-dot" title="Unsaved changes">*</span>
+</header>
+
+<div class="main-tabs">
+  <div class="main-tab active" onclick="switchTab('keymap')">Keymap</div>
+  <div class="main-tab" onclick="switchTab('trackpad')">Trackpad</div>
+  <div class="main-tab" onclick="switchTab('general')">General</div>
+  <div class="main-tab" onclick="switchTab('conditional')">Conditional</div>
+  <div class="main-tab" onclick="switchTab('modtap')">TapDance</div>
+  <div class="main-tab" onclick="switchTab('combo')">Combo</div>
+  <div class="main-tab" onclick="switchTab('macro')">Macro</div>
+</div>
+
+<div id="tab-keymap" class="tab-pane active">
+  <div class="layer-bar" id="layer-bar">
+    <span style="color:var(--dim);font-size:11px">Layer:</span>
+  </div>
+  <div class="split">
+    <div class="kb-area" id="kb-area">
+      <div class="no-data-box" id="no-data-box">
+        <h2>Firmware folder is not loaded</h2>
+        <p>Open Settings and select your LaLapad Gen2 firmware folder.</p>
+        <button class="btn primary" onclick="openSettings()">Open Settings</button>
+      </div>
+      <div class="keyboard d-none" id="keyboard"></div>
+    </div>
+    <div class="tab-palette-slot active" id="pal-slot-keymap">
+    <div class="palette" id="palette-panel">
+      <div class="pal-head d-none" id="pal-head">
+        <div class="pal-head-main">
+          <div class="pal-title" id="pal-title"></div>
+          <div class="pal-note" id="pal-note"></div>
+        </div>
+        <button class="btn sm" id="pal-close" onclick="clearPaletteContext()">Back</button>
+      </div>
+      <div class="pal-tabs" id="pal-tabs"></div>
+      <div id="pal-body"></div>
+    </div>
+    </div>
+  </div>
+</div>
+
+<div id="tab-trackpad" class="tab-pane">
+  <div class="sub-bar">
+    <button class="tp-btn active" onclick="switchTpSide('left')">Left Trackpad</button>
+    <button class="tp-btn" onclick="switchTpSide('right')">Right Trackpad</button>
+  </div>
+  <div class="layer-bar" id="tp-layer-bar">
+    <span style="color:var(--dim);font-size:11px">Layer:</span>
+  </div>
+  <div style="padding:8px 14px;flex-shrink:0;border-bottom:1px solid var(--bdr);">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+      <div style="font-size:10px;color:var(--a2);text-transform:uppercase;letter-spacing:.05em;">
+        Gesture bindings
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        <button class="btn sm" id="tp-gesture-copy-btn" onclick="copyCurrentTpGestureBindings()">Copy to opposite side</button>
+      </div>
+    </div>
+    <div class="gest-grid" id="tp-gesture-keys"></div>
+  </div>
+  <div class="settings-grid" id="tp-settings"></div>
+  <div class="tab-palette-slot" id="pal-slot-trackpad"></div>
+</div>
+
+<div id="tab-general" class="tab-pane">
+  <div class="sub-bar">
+    <span style="color:var(--dim);font-size:11px">Main config (`lalapadgen2.conf`)</span>
+  </div>
+  <div class="settings-grid" id="general-settings"></div>
+  <div class="tab-palette-slot" id="pal-slot-general"></div>
+</div>
+
+<div id="tab-conditional" class="tab-pane">
+  <div class="sub-bar">
+    <span style="color:var(--dim);font-size:11px">`conditional_layers` の設定</span>
+    <div style="flex:1"></div>
+    <button class="btn sm blue" onclick="addConditionalLayer()">ルールを追加</button>
+  </div>
+  <div class="combo-list" id="conditional-list"></div>
+  <div class="tab-palette-slot" id="pal-slot-conditional"></div>
+</div>
+
+<div id="tab-modtap" class="tab-pane">
+  <div class="sub-bar">
+    <span style="color:var(--dim);font-size:11px">タップダンスの設定 (td0〜td31) — Save All で keymap に書き込まれます</span>
+    <button class="btn sm blue" onclick="importMt2FromKeymap()">Import legacy &amp;mt2</button>
+  </div>
+  <div class="td-layout">
+    <div class="td-list-panel" id="td-list-panel"></div>
+    <div class="td-detail-panel" id="td-detail-panel">
+      <div style="color:var(--dim);font-size:12px;padding:20px">左のリストから TD スロットを選択してください</div>
+    </div>
+  </div>
+  <div class="tab-palette-slot" id="pal-slot-modtap"></div>
+</div>
+
+<div id="tab-combo" class="tab-pane">
+  <div class="sub-bar">
+    <span style="color:var(--dim);font-size:11px">コンボの設定（同時押しキーはキーボードレイアウトから選択）</span>
+    <div style="flex:1"></div>
+    <button class="btn sm blue" onclick="addCombo()">コンボを追加</button>
+  </div>
+  <div class="combo-list" id="combo-list"></div>
+  <div class="tab-palette-slot" id="pal-slot-combo"></div>
+</div>
+
+<div id="tab-macro" class="tab-pane">
+  <div class="sub-bar">
+    <span style="color:var(--dim);font-size:11px">マクロの設定 (mc0〜mc15) — Save All で keymap に書き込まれます</span>
+    <div class="macro-tools">
+      <span class="macro-current-path" id="macro-current-path"></span>
+      <select class="macro-restore-select" id="macro-restore-select"></select>
+      <button class="btn sm blue" id="macro-restore-btn" onclick="restoreSelectedMacroSource()">他フォルダから復元</button>
+    </div>
+  </div>
+  <div class="macro-layout">
+    <div class="macro-list-panel" id="macro-list-panel"></div>
+    <div class="macro-editor-panel" id="macro-editor-panel">
+      <div style="color:var(--dim);font-size:12px;padding:20px">左のリストからマクロを選択してください</div>
+    </div>
+  </div>
+  <div class="tab-palette-slot" id="pal-slot-macro"></div>
+</div>
+
+<div class="status-bar">
+  <span id="status-msg">Ready</span>
+  <span style="flex:1"></span>
+  <span id="status-hover" class="status-code"></span>
+  <span id="status-info"></span>
+</div>
+
+<div class="overlay" id="settings-ov">
+  <div class="modal" style="min-width:500px">
+    <h2>Settings</h2>
+    <div class="frow">
+      <label>LaLapad Gen2 firmware folder</label>
+      <div class="path-row">
+        <input type="text" id="cfg-folder" placeholder="例: D:\zmk-config-LalaPadGen2-main">
+        <button class="btn" onclick="browseFolder()">Browse...</button>
+        <button class="btn blue" onclick="applyFolder()">Check</button>
+      </div>
+      <p style="font-size:10px;color:var(--muted);margin-top:5px">
+        &#9432;&nbsp;ZMK config リポジトリのルート（<code style="font-size:10px;color:var(--dim)">config/*.keymap</code> を含むフォルダ）を選択してください。<br>
+        ZIP を展開した場合、展開先フォルダ内の<strong>サブフォルダ</strong>（例: <code style="font-size:10px;color:var(--dim)">zmk-config-LalaPadGen2-main</code>）を指定してください。
+      </p>
+    </div>
+    <div class="found-files d-none" id="found-files"></div>
+    <div class="folder-history d-none" id="folder-history"></div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeSettings()">Close</button>
+      <button class="btn primary d-none" id="apply-btn" onclick="saveAndLoad()">Apply and Load</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="key-edit-ov">
+  <div class="modal">
+    <h2>Edit Key: <span id="edit-title" style="color:var(--text)"></span></h2>
+    <div class="frow">
+      <label>Binding (ZMK format)</label>
+      <input type="text" id="edit-binding" placeholder="&kp A / &mo 1 / &td0 / &ng_on">
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:9px">
+      <b>&amp;trans</b> = transparent
+      &nbsp;
+      <b>&amp;none</b> = disabled
+      &nbsp;
+      <b>&amp;kp KEY</b> = normal key
+      &nbsp;
+      <b>&amp;mo N</b> = momentary layer
+      &nbsp;
+      <b>&amp;td0</b> = TapDance slot
+    </div>
+    <div style="font-size:11px;color:var(--dim);margin-bottom:5px">Current keycode</div>
+    <div class="quick-grid" id="quick-grid"></div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeKeyEdit()">Cancel</button>
+      <button class="btn primary" onclick="applyKeyEdit()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="mt-edit-ov">
+  <div class="modal" style="min-width:620px">
+    <h2>TapDance: <span id="mt-title" style="color:var(--text)"></span></h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div>
+        <div style="font-size:11px;color:var(--dim);margin-bottom:4px">Single Tap</div>
+        <div class="mt-drop-zone" id="td-single-tap-zone"
+             ondragover="event.preventDefault();this.classList.add('drag-over')"
+             ondragleave="this.classList.remove('drag-over')"
+             ondrop="dropOnTdZone('single_tap',event)"
+             onclick="openBindingPickerForTdField('single_tap')">
+          <span id="td-single-tap-disp" class="mt-zone-text">Drag a binding here or click</span>
+        </div>
+        <input type="text" id="td-single-tap" style="width:100%;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);padding:4px 6px;border-radius:3px;font-size:11px;" placeholder="Example: &kp A / &kp LG(TAB)">
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--dim);margin-bottom:4px">Single Hold</div>
+        <div class="mt-drop-zone" id="td-single-hold-zone"
+             ondragover="event.preventDefault();this.classList.add('drag-over')"
+             ondragleave="this.classList.remove('drag-over')"
+             ondrop="dropOnTdZone('single_hold',event)"
+             onclick="openBindingPickerForTdField('single_hold')">
+          <span id="td-single-hold-disp" class="mt-zone-text">Drag a binding here or click</span>
+        </div>
+        <input type="text" id="td-single-hold" style="width:100%;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);padding:4px 6px;border-radius:3px;font-size:11px;" placeholder="Example: &kp LEFT_SHIFT / &kp A">
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--dim);margin-bottom:4px">Double Tap</div>
+        <div class="mt-drop-zone" id="td-double-tap-zone"
+             ondragover="event.preventDefault();this.classList.add('drag-over')"
+             ondragleave="this.classList.remove('drag-over')"
+             ondrop="dropOnTdZone('double_tap',event)"
+             onclick="openBindingPickerForTdField('double_tap')">
+          <span id="td-double-tap-disp" class="mt-zone-text">Drag a binding here or click</span>
+        </div>
+        <input type="text" id="td-double-tap" style="width:100%;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);padding:4px 6px;border-radius:3px;font-size:11px;" placeholder="Example: &kp ESCAPE / &bt BT_SEL 0">
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--dim);margin-bottom:8px">Single Tap / Single Hold / Double Tap の 3 状態で任意の binding を設定できます。Quantum の modified key を選んだ場合は追加キーまで選択してください。再帰防止のため &amp;tdN は設定できません。</div>
+    <div class="frow">
+      <label>Tapping Term (ms)</label>
+      <input type="number" id="mt-term" value="200" min="50" max="1000">
+    </div>
+    <div style="font-size:11px;color:var(--dim);margin-bottom:4px">Generated public binding</div>
+    <div style="font-size:12px;color:var(--ok);background:var(--bg);padding:6px 8px;border-radius:4px;margin-bottom:10px;font-family:monospace;" id="mt-preview"></div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeMtEdit()">Cancel</button>
+      <button class="btn primary" onclick="applyMtEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="key-picker d-none" id="key-picker">
+  <h4>Select Key <button class="btn sm" onclick="closeKeyPicker()" style="font-size:10px;padding:1px 6px">Close</button></h4>
+  <input type="text" class="kp-search" id="kp-search" placeholder="Filter..." oninput="filterKeyPicker()">
+  <div class="kp-grid" id="kp-grid"></div>
+</div>
+<div id="picker-backdrop" class="d-none" style="position:fixed;inset:0;z-index:2999;" onclick="closeKeyPicker()"></div>
+
+<div class="overlay" id="combo-kb-ov">
+  <div class="modal" style="max-width:820px;width:95vw">
+    <h2>コンボキー選択: <span id="combo-kb-combo-name" style="color:var(--text)"></span></h2>
+    <p style="font-size:11px;color:var(--dim);margin-bottom:10px">同時押しにするキーをクリックして選択 / 解除してください。</p>
+    <div id="combo-kb-container" style="overflow-x:auto;padding-bottom:4px;"></div>
+    <div style="margin-top:8px;padding:6px 8px;background:var(--bg);border-radius:4px;border:1px solid var(--bdr2);font-size:11px;">
+      <span style="color:var(--dim)">選択中のキー番号: </span><span id="combo-kb-sel-disp" style="color:var(--accent);font-family:monospace;"></span>
+    </div>
+    <div class="modal-btns">
+      <button class="btn" onclick="closeComboKbPicker()">キャンセル</button>
+      <button class="btn primary" onclick="applyComboKbPicker()">適用</button>
+    </div>
+  </div>
+</div>
+<div class="key-picker binding-picker d-none" id="binding-picker">
+  <h4><span id="binding-picker-title">Binding Palette</span><button class="btn sm" onclick="closeBindingPicker()" style="font-size:10px;padding:1px 6px">Close</button></h4>
+  <div class="picker-tabs" id="binding-picker-tabs"></div>
+  <div class="picker-body" id="binding-picker-body"></div>
+</div>
+<div id="binding-picker-backdrop" class="d-none" style="position:fixed;inset:0;z-index:2999;" onclick="closeBindingPicker()"></div>
+
+<script>
+// 笏笏 螳壽焚 笏笏
+const MOD_PH = 'XXXXXXXX'; // 菫ｮ鬟ｾ繧ｭ繝ｼ繝ｩ繝・ヱ繝ｼ縺ｮ繝励Ξ繝ｼ繧ｹ繝帙Ν繝繝ｼ
+const SCALE=0.58, GAP=3, TD_COUNT=32, MACRO_COUNT=16;
+const TAB_NAMES=['keymap','trackpad','general','conditional','modtap','combo','macro'];
+const MACRO_RE=/^&mc(\d+)$/;
+
+function repairQuantumModifiedBinding(raw){
+  const s=(raw||'').trim();
+  if(!s.startsWith('&kp ')) return s;
+  const body=s.slice(4);
+  const openCount=(body.match(/\(/g)||[]).length;
+  const closeCount=(body.match(/\)/g)||[]).length;
+  return openCount>closeCount ? `&kp ${body}${')'.repeat(openCount-closeCount)}` : s;
+}
+
+// 笏笏 繧ｭ繝ｼ繝懊・繝峨Ξ繧､繧｢繧ｦ繝・(68繧ｭ繝ｼ) 笏笏
+const KL=[
+  {x:0,y:0,w:100,h:100},{x:100,y:0,w:100,h:100},{x:200,y:0,w:100,h:100},{x:300,y:0,w:100,h:100},{x:400,y:0,w:100,h:100},
+  {x:800,y:0,w:100,h:100},{x:900,y:0,w:100,h:100},{x:1000,y:0,w:100,h:100},{x:1100,y:0,w:100,h:100},{x:1200,y:0,w:100,h:100},
+  {x:0,y:100,w:100,h:100},{x:100,y:100,w:100,h:100},{x:200,y:100,w:100,h:100},{x:300,y:100,w:100,h:100},{x:400,y:100,w:100,h:100},
+  {x:800,y:100,w:100,h:100},{x:900,y:100,w:100,h:100},{x:1000,y:100,w:100,h:100},{x:1100,y:100,w:100,h:100},{x:1200,y:100,w:100,h:100},
+  {x:0,y:200,w:100,h:100},{x:100,y:200,w:100,h:100},{x:200,y:200,w:100,h:100},{x:300,y:200,w:100,h:100},{x:400,y:200,w:100,h:100},
+  {x:800,y:200,w:100,h:100},{x:900,y:200,w:100,h:100},{x:1000,y:200,w:100,h:100},{x:1100,y:200,w:100,h:100},{x:1200,y:200,w:100,h:100},
+  {x:0,y:300,w:100,h:100},{x:100,y:300,w:100,h:100},{x:200,y:300,w:100,h:100},{x:300,y:300,w:100,h:100},{x:400,y:300,w:100,h:100},{x:500,y:300,w:100,h:100},
+  {x:700,y:300,w:100,h:100},{x:800,y:300,w:100,h:100},{x:900,y:300,w:100,h:100},{x:1000,y:300,w:100,h:100},{x:1100,y:300,w:100,h:100},{x:1200,y:300,w:100,h:100},
+  {x:400,y:450,w:50,h:50},{x:450,y:450,w:50,h:50},{x:400,y:500,w:50,h:50},{x:350,y:450,w:50,h:50},{x:400,y:400,w:50,h:50},
+  {x:850,y:400,w:50,h:50},{x:800,y:450,w:50,h:50},{x:850,y:500,w:50,h:50},{x:900,y:450,w:50,h:50},{x:850,y:450,w:50,h:50},
+  // Row5: 繝槭え繧ｹ繝懊ち繝ｳ (MB1-3 ﾃ・荳｡蛛ｴ) = index 52-57
+  {x:0,y:500,w:100,h:100},{x:100,y:500,w:100,h:100},{x:200,y:500,w:100,h:100},
+  {x:1000,y:500,w:100,h:100},{x:1100,y:500,w:100,h:100},{x:1200,y:500,w:100,h:100},
+  // Row6: 繧ｸ繧ｧ繧ｹ繝√Ε繝ｼ (swipes + pinch mod) = index 58-67
+  {x:0,y:600,w:100,h:100},{x:100,y:600,w:100,h:100},{x:200,y:600,w:100,h:100},{x:300,y:600,w:100,h:100},{x:400,y:600,w:100,h:100},
+  {x:800,y:600,w:100,h:100},{x:900,y:600,w:100,h:100},{x:1000,y:600,w:100,h:100},{x:1100,y:600,w:100,h:100},{x:1200,y:600,w:100,h:100},
+];
+
+// 繧ｸ繧ｧ繧ｹ繝√Ε繝ｼ繧ｭ繝ｼ: 蟾ｦ=[52,53,54,58,59,60,61,62] 蜿ｳ=[55,56,57,63,64,65,66,67]
+const TP_CLUSTER={
+  left: [52,53,54,58,59,60,61,62],
+  right:[55,56,57,63,64,65,66,67],
+};
+const TP_GESTURES=[
+  {slot:'Tap1',label:'1本指タップ'},
+  {slot:'Tap2',label:'2本指タップ'},
+  {slot:'Tap3',label:'3本指タップ'},
+  {slot:'SwpR',label:'3本指スワイプ右'},
+  {slot:'SwpL',label:'3本指スワイプ左'},
+  {slot:'SwpU',label:'3本指スワイプ上'},
+  {slot:'SwpD',label:'3本指スワイプ下'},
+  {slot:'Pinch',label:'2本指ピンチ修飾キー'},
+];
+const TP_GESTURE_LABELS=TP_GESTURES.map(item=>`${item.slot}: ${item.label}`);
+
+// 笏笏 繧ｭ繝ｼ蜷・竊・陦ｨ遉ｺ繝ｩ繝吶Ν 笏笏
+const KN={
+  LEFT_SHIFT:'LSft',RIGHT_SHIFT:'RSft',LEFT_CONTROL:'LCtl',RIGHT_CONTROL:'RCtl',
+  LEFT_ALT:'LAlt',RIGHT_ALT:'RAlt',LEFT_GUI:'LGui',RIGHT_GUI:'RGui',
+  LSHIFT:'LSft',RSHIFT:'RSft',LCTRL:'LCtl',RCTRL:'RCtl',LALT:'LAlt',RALT:'RAlt',LGUI:'LGui',RGUI:'RGui',
+  LWIN:'LWin',RWIN:'RWin',
+  SPACE:'SPC',BACKSPACE:'BSP',DELETE:'DEL',ENTER:'ENT',ESCAPE:'ESC',TAB:'TAB',CAPS:'CAP',INSERT:'INS',
+  LEFT:'Left',RIGHT:'Right',UP:'Up',DOWN:'Down',HOME:'Home',END:'End',PAGE_UP:'PgUp',PAGE_DOWN:'PgDn',
+  PRINTSCREEN:'PrtSc',SCROLLLOCK:'ScrLk',PAUSE_BREAK:'Pause',
+  GRAVE:'`',MINUS:'-',EQUAL:'=',LEFT_BRACKET:'[',RIGHT_BRACKET:']',BACKSLASH:'\\',
+  SEMI:';',SQT:"'",COMMA:',',PERIOD:'.',SLASH:'/',
+  NUMBER_0:'0',NUMBER_1:'1',NUMBER_2:'2',NUMBER_3:'3',NUMBER_4:'4',
+  NUMBER_5:'5',NUMBER_6:'6',NUMBER_7:'7',NUMBER_8:'8',NUMBER_9:'9',
+  KP_NUMBER_0:'0',KP_NUMBER_1:'1',KP_NUMBER_2:'2',KP_NUMBER_3:'3',KP_NUMBER_4:'4',
+  KP_NUMBER_5:'5',KP_NUMBER_6:'6',KP_NUMBER_7:'7',KP_NUMBER_8:'8',KP_NUMBER_9:'9',
+  KP_PLUS:'K+',KP_MINUS:'K-',KP_ASTERISK:'K*',KP_DIVIDE:'K/',KP_DOT:'K.',
+  KP_COMMA:'K,',KP_EQUAL:'K=',KP_NUMLOCK:'Num',KP_ENTER:'Ent',
+  K_MENU:'Menu',
+  LANGUAGE_1:'日',LANGUAGE_2:'英',
+};
+const MOD_EXPR_LABELS={
+  LEFT_SHIFT:'LSft',RIGHT_SHIFT:'RSft',LEFT_CONTROL:'LCtl',RIGHT_CONTROL:'RCtl',
+  LEFT_ALT:'LAlt',RIGHT_ALT:'RAlt',LEFT_GUI:'LGui',RIGHT_GUI:'RGui',
+  LSHIFT:'LSft',RSHIFT:'RSft',LCTRL:'LCtl',RCTRL:'RCtl',LALT:'LAlt',RALT:'RAlt',LGUI:'LGui',RGUI:'RGui',
+  'LS(LCTRL)':'LCS','LC(LSHIFT)':'LCS',
+  'LA(LCTRL)':'LCA','LC(LALT)':'LCA',
+  'LG(LCTRL)':'LCG','LC(LGUI)':'LCG',
+  'LA(LSHIFT)':'LSA','LS(LALT)':'LSA',
+  'LG(LSHIFT)':'LSG','LS(LGUI)':'LSG',
+  'LG(LALT)':'LAG','LA(LGUI)':'LAG',
+  'LG(LS(LCTRL))':'LCSG','LC(LS(LGUI))':'LCSG',
+  'LG(LA(LCTRL))':'LCAG','LC(LA(LGUI))':'LCAG',
+  'LG(LA(LSHIFT))':'LSAG','LS(LA(LGUI))':'LSAG',
+  'LS(LA(LCTRL))':'Meh','LC(LS(LALT))':'Meh',
+  'LG(LS(LA(LCTRL)))':'Hyper',
+  'RC(RSHIFT)':'RCS','RS(RCTRL)':'RCS',
+  'RA(RCTRL)':'RCA','RC(RALT)':'RCA',
+  'RG(RCTRL)':'RCG','RC(RGUI)':'RCG',
+  'RA(RSHIFT)':'RSA','RS(RALT)':'RSA',
+  'RG(RSHIFT)':'RSG','RS(RGUI)':'RSG',
+  'RG(RALT)':'RAG','RA(RGUI)':'RAG',
+};
+function shortKeyLabel(k){
+  if(!k) return '?';
+  const m=k.match(/^([LR][GCAS])\((.+)\)$/);
+  if(m) return `${m[1]}(${shortKeyLabel(m[2])})`;
+  if(k in KN) return KN[k];
+  if(MOD_EXPR_LABELS[k]) return MOD_EXPR_LABELS[k];
+  if(/^F\d+$/.test(k)) return k;
+  return formatPaletteKeycodeLabel(k);
+}
+function kl(k){ return shortKeyLabel(k); }
+function palItem(r,l,title=''){ return {r,l,title}; }
+function modWrap(prefix,label,title=''){
+  return palItem(
+    repairQuantumModifiedBinding(`&kp ${prefix}(${MOD_PH}`),
+    `${label}\n(kc)`,
+    title
+  );
+}
+function mtFieldChoice(expr,label,title=''){ return palItem(expr,label,title); }
+function abbreviateKeycodeToken(token){
+  return {
+    SYSTEM:'SYS', POWER:'PWR', SLEEP:'SLP', WAKE:'WAKE',
+    NON:'NON', BACKSLASH:'BSL', INTERNATIONAL:'INTL', LANGUAGE:'LANG',
+    APPLICATION:'APP', EXECUTE:'EXEC', SELECT:'SEL', AGAIN:'AGAIN',
+    VOLUME:'VOL', PREVIOUS:'PREV', FORWARD:'FWD', REFRESH:'REFR',
+    CALCULATOR:'CALC', BRIGHTNESS:'BRI', MINIMUM:'MIN', MAXIMUM:'MAX',
+    TOGGLE:'TOG', RANDOM:'RAND', REPEAT:'RPT', CHANNEL:'CH',
+    COMMAND:'CMD', KEYBOARD:'KBD', INPUT:'IN', ASSIST:'AST',
+    ACCEPT:'OK', CANCEL:'CXL', SCREEN:'SCRN', SAVER:'SAVE',
+    CAPTIONS:'CAPTN', SNAPSHOT:'SHOT', YELLOW:'YLW', GREEN:'GRN',
+    BLUE:'BLU', RED:'RED', INCREASE:'INC', DECREASE:'DEC',
+    COMPUTER:'PC', VIDEOPHONE:'VIDEO', MESSAGES:'MSG', SATELLITE:'SAT',
+    JOURNAL:'JRNL', CONTACTS:'CNTC', CONTROL:'CTRL', PANEL:'PNL',
+    DOCUMENTS:'DOC', SPELLCHECK:'SPELL', BROWSER:'BROW',
+    INSTANT:'IM', MESSAGING:'MSG', PROPERTIES:'PROP', BOOKMARKS:'BM',
+    INSERT:'INS', DESKTOP:'DSK', WINDOWS:'WIN', APPLICATIONS:'APPS',
+    LAYOUT:'LAYOUT', ALTERNATE:'ALT', AUDIO:'AUD', INCREMENT:'INC',
+    EJECT:'EJCT', SCROLL:'SCRL', PAUSE:'PAUSE', PLAY:'PLAY',
+    RECORD:'REC', FAST:'FAST', REWIND:'REW', STOP:'STOP',
+    HELP:'HELP', FIND:'FIND', PASTE:'PST', COPY:'COPY',
+    CUT:'CUT', HOME:'HOME', OPEN:'OPEN', CLOSE:'CLOSE',
+    SAVE:'SAVE', PRINT:'PRINT', SEARCH:'SRCH', VIEW:'VIEW',
+    EDIT:'EDIT', REPLY:'RPLY', SEND:'SEND', MAIL:'MAIL',
+    NEXT:'NEXT', GROUP:'GRP', MODE:'MODE', VOICEMAIL:'VMAIL',
+    NETWORK:'NET', LOCKING:'LOCK', CLEAR:'CLR', RETURN:'RET',
+    SEPARATOR:'SEP', PRIOR:'PRIOR', AS400:'AS400',
+  }[token] || token;
+}
+function formatPaletteKeycodeLabel(code){
+  const raw=String(code||'').trim();
+  if(!raw) return '?';
+  if(/^[LR][GCAS]\(.+\)$/.test(raw)) return shortKeyLabel(raw);
+  if(raw in KN || /^F\d+$/.test(raw)) return raw in KN ? KN[raw] : raw;
+  const prefixMap=[
+    ['C_KEYBOARD_INPUT_ASSIST_','KIA'],
+    ['C_AC_','AC'],
+    ['C_AL_','AL'],
+    ['C_','C'],
+    ['K_','K'],
+    ['KP_','KP'],
+  ];
+  let prefix='';
+  let tail=raw;
+  prefixMap.some(([start,label])=>{
+    if(raw.startsWith(start)){ prefix=label; tail=raw.slice(start.length); return true; }
+    return false;
+  });
+  const tokens=tail.split('_').filter(Boolean).map(abbreviateKeycodeToken);
+  const first=tokens.slice(0,2).join(' ');
+  const second=tokens.slice(2,4).join(' ');
+  return [prefix, first, second].filter(Boolean).join('\n');
+}
+function kpCodeItem(code,title=''){ return palItem(`&kp ${code}`,formatPaletteKeycodeLabel(code),title||code.replace(/_/g,' ')); }
+function kpCodeItems(codes){ return codes.map(code=>kpCodeItem(code)); }
+function disabledItem(label,title=''){ return {r:'',l:label,title,disabled:true}; }
+function gap(size='g1'){ return {gap:size}; }
+function getLayerIndices(){ return Array.from({length:Math.max(state.layers.length||0,5)},(_,i)=>i); }
+function getConditionalLayerHint(){
+  return 'On this keyboard, holding layer 1 and layer 2 together also activates layer 3 through conditional layers.';
+}
+
+// 笏笏 繝舌う繝ｳ繝・ぅ繝ｳ繧ｰ 繝ｩ繝吶Ν/繧ｯ繝ｩ繧ｹ 笏笏
+const BUILTINS=new Set(['kp','mt','mo','to','tog','lt','mkp','bt','out','sys_reset','bootloader',
+  'trans','none','sk','sl',
+  'caps_word','nkro','gresc','key_repeat','soft_off','studio_unlock']);
+const TD_PUBLIC_RE=/^&td\d+$/;
+
+function bindingLabel(raw){
+  if(!raw) return '?';
+  const s=raw.trim();
+  if(s.startsWith('&kp ')){
+    const inner=s.replace(/^&kp\s+/,'');
+    if(inner.includes('(')) return shortKeyLabel(inner);
+  }
+  // パレット定義のラベルを最優先で参照（パレットとキーマップの表示を統一）
+  if(PAL_LABEL[s]) return PAL_LABEL[s];
+  if(s==='&trans') return '▽';
+  if(s==='&none') return '';
+  if(s==='&sys_reset') return 'RST';
+  if(s==='&bootloader') return 'BOOT';
+  if(s==='&tap_dance_layer_1and2') return 'TD\n1&2';
+  if(s==='&gresc') return 'GESC';
+  if(s==='&caps_word') return 'CAPW';
+  if(s==='&key_repeat') return 'RPT';
+  if(TD_PUBLIC_RE.test(s)) return s.replace(/^&/,'').toUpperCase();
+  const mcM=s.match(MACRO_RE);
+  if(mcM){ const idx=parseInt(mcM[1]); return `mc${idx}`; }
+  // 菫ｮ鬟ｾ繝励Ξ繝ｼ繧ｹ繝帙Ν繝繝ｼ
+  if(s.includes(MOD_PH)){
+    const p=s.replace(/^&/,'').split(/\s+/);
+    if(p[0]==='lt') return `LT(${p[1]||'?'})\n(kc)`;
+    const inner=s.replace(/^&kp\s+/,'');
+    if(inner) return inner.replace(MOD_PH,'kc');
+    return '?';
+  }
+  const p=s.replace(/^&/,'').split(/\s+/);
+  const beh=p[0],a=p.slice(1);
+  switch(beh){
+    case 'kp': return shortKeyLabel(a[0]||'?');
+    case 'mt':case 'mt2': return shortKeyLabel(a[1]||'?')+'\n'+shortKeyLabel(a[0]||'?');
+    case 'lt': return `LT(${a[0]||'?'})\n${kl(a[1]||'?')}`;
+    case 'mo': return `MO${a[0]||'?'}`;
+    case 'to': return `TO${a[0]||'?'}`;
+    case 'tog': return `TG${a[0]||'?'}`;
+    case 'sk': return 'OSM\n'+shortKeyLabel(a[0]||'?');
+    case 'sl': return `SL${a[0]||'?'}`;
+    case 'mkp': return({LCLK:'MB1',RCLK:'MB2',MCLK:'MB3',MB4:'MB4',MB5:'MB5'})[a[0]]||a[0]||'?';
+    case 'bt':
+      if(a[0]==='BT_SEL') return 'BT'+(a[1]||'?');
+      if(a[0]==='BT_CLR') return 'BTCLR';
+      if(a[0]==='BT_CLR_ALL') return 'BTCLA';
+      return 'BT:'+(a[0]||'?');
+    case 'out': return 'OUT';
+    case 'zip_dyn_scale':{
+      const t={ZDS_XY:'CUR',ZDS_SC:'SCL',ZDS_ALL:'ALL'}[a[0]]||a[0];
+      const d={ZDS_INC:'+',ZDS_DEC:'-',ZDS_RST:'RST'}[a[1]]||a[1];
+      return t+'\n'+d;
+    }
+    default: return a.length?beh+'\n'+kl(a[0]):beh;
+  }
+}
+function bindingClass(raw){
+  if(!raw) return '';
+  const s=raw.trim();
+  if(!s.startsWith('&')) return '';
+  if(s==='&trans') return 'k-trans';
+  if(s==='&none') return 'k-none';
+  if(s.includes(MOD_PH)) return 'k-mod';
+  if(TD_PUBLIC_RE.test(s)) return 'k-mt';
+  if(MACRO_RE.test(s)) return 'k-macro';
+  const beh=s.replace(/^&/,'').split(/\s+/)[0];
+  if(['mo','to','tog','lt','tap_dance_layer_1and2'].includes(beh)) return 'k-mo';
+  if(['mt','mt2'].includes(beh)) return 'k-mt';
+  if(['sys_reset','bootloader','out'].includes(beh)) return 'k-sys';
+  if(beh==='bt') return 'k-bt';
+  if(beh==='mkp') return 'k-mouse';
+  if(beh.startsWith('zip')) return 'k-dyn';
+  if(!BUILTINS.has(beh)) return 'k-custom';
+  return '';
+}
+
+// 笏笏 TD 笏笏
+function tdEmpty(){ return {single_tap:'',single_hold:'',double_tap:'',tapping_term:200,display_name:''}; }
+function normalizeTdBinding(raw){
+  const s=(raw||'').trim();
+  if(!s) return '';
+  return repairQuantumModifiedBinding(s.startsWith('&') ? s : '&'+s);
+}
+function getTd(i){ return state.tdDefs[i]||tdEmpty(); }
+function tdPublicRaw(i){ return `&td${i}`; }
+function tdPreviewRaw(i){
+  return tdPublicRaw(i);
+}
+function tdLabel(i){
+  const d=getTd(i);
+  if(![d.single_tap,d.single_hold,d.double_tap].some(Boolean)) return `TD${i}`+"\n"+``;
+  const top=bindingLabel(d.single_tap||d.single_hold||d.double_tap||'&none').split('\n')[0];
+  const bottom=[
+    d.single_hold?'H1':'',
+    d.double_tap?'T2':'',
+  ].filter(Boolean).join(' ');
+  return `TD${i}`+"\n"+(bottom||top);
+}
+function tdPaletteLabel(i){
+  return `TD${i}`;
+}
+async function saveTdDefs(){ return api('/api/settings','POST',{td_definitions:state.tdDefs}); }
+
+// 笏笏 繝代Ξ繝・ヨ繝・・繧ｿ 笏笏
+const QWERTY_ROWS=[
+  [
+    {r:'&kp ESCAPE',l:'Esc'},gap(28),
+    {r:'&kp F1',l:'F1'},{r:'&kp F2',l:'F2'},{r:'&kp F3',l:'F3'},{r:'&kp F4',l:'F4'},gap(19),
+    {r:'&kp F5',l:'F5'},{r:'&kp F6',l:'F6'},{r:'&kp F7',l:'F7'},{r:'&kp F8',l:'F8'},gap(19),
+    {r:'&kp F9',l:'F9'},{r:'&kp F10',l:'F10'},{r:'&kp F11',l:'F11'},{r:'&kp F12',l:'F12'},gap(28),
+    {r:'&kp PRINTSCREEN',l:'Print\nScreen',w:'w13'},{r:'&kp SCROLLLOCK',l:'Scroll\nLock',w:'w13'},{r:'&kp PAUSE_BREAK',l:'Pause',w:'w13'}
+  ],
+  [
+    palItem('&kp GRAVE','~\n`'),palItem('&kp NUMBER_1','!\n1'),palItem('&kp NUMBER_2','@\n2'),palItem('&kp NUMBER_3','#\n3'),
+    palItem('&kp NUMBER_4','$\n4'),palItem('&kp NUMBER_5','%\n5'),palItem('&kp NUMBER_6','^\n6'),palItem('&kp NUMBER_7','&\n7'),
+    palItem('&kp NUMBER_8','*\n8'),palItem('&kp NUMBER_9','(\n9'),palItem('&kp NUMBER_0',')\n0'),palItem('&kp MINUS','_\n-'),
+    palItem('&kp EQUAL','+\n='),{r:'&kp BACKSPACE',l:'Bksp',w:'w_bksp',title:'Backspace'},gap(28),
+    {r:'&kp INSERT',l:'Insert',w:'w13'},{r:'&kp HOME',l:'Home',w:'w13'},{r:'&kp PAGE_UP',l:'Page\nUp',w:'w13'},gap(28),
+    {r:'&kp KP_NUMLOCK',l:'Num\nLock',w:'w13'},{r:'&kp KP_DIVIDE',l:'/',w:'w13'},{r:'&kp KP_ASTERISK',l:'*',w:'w13'},{r:'&kp KP_MINUS',l:'-',w:'w13'}
+  ],
+  [
+    {r:'&kp TAB',l:'Tab',w:'w_tab',title:'Tab'},palItem('&kp Q','Q'),palItem('&kp W','W'),palItem('&kp E','E'),palItem('&kp R','R'),
+    palItem('&kp T','T'),palItem('&kp Y','Y'),palItem('&kp U','U'),palItem('&kp I','I'),palItem('&kp O','O'),palItem('&kp P','P'),
+    palItem('&kp LEFT_BRACKET','{\n['),palItem('&kp RIGHT_BRACKET','}\n]'),palItem('&kp BACKSLASH','|\n\\'),gap(28),
+    {r:'&kp DELETE',l:'Del',w:'w13'},{r:'&kp END',l:'End',w:'w13'},{r:'&kp PAGE_DOWN',l:'Page\nDown',w:'w13'},gap(28),
+    {r:'&kp KP_NUMBER_7',l:'7',w:'w13'},{r:'&kp KP_NUMBER_8',l:'8',w:'w13'},{r:'&kp KP_NUMBER_9',l:'9',w:'w13'},{r:'&kp KP_PLUS',l:'+',w:'w13'}
+  ],
+  [
+    {r:'&kp CAPS',l:'Caps\nLock',w:'w_caps',title:'Caps Lock'},palItem('&kp A','A'),palItem('&kp S','S'),palItem('&kp D','D'),palItem('&kp F','F'),
+    palItem('&kp G','G'),palItem('&kp H','H'),palItem('&kp J','J'),palItem('&kp K','K'),palItem('&kp L','L'),palItem('&kp SEMI',':\n;'),
+    palItem('&kp SQT','"\n\''),{r:'&kp ENTER',l:'Enter',w:'w_enter',title:'Enter'},gap(212),
+    {r:'&kp KP_NUMBER_4',l:'4',w:'w13'},{r:'&kp KP_NUMBER_5',l:'5',w:'w13'},{r:'&kp KP_NUMBER_6',l:'6',w:'w13'},{r:'&kp KP_COMMA',l:',',w:'w13'}
+  ],
+  [
+    {r:'&kp LEFT_SHIFT',l:'LShift',w:'w_lshift',title:'Left Shift'},palItem('&kp Z','Z'),palItem('&kp X','X'),palItem('&kp C','C'),palItem('&kp V','V'),
+    palItem('&kp B','B'),palItem('&kp N','N'),palItem('&kp M','M'),palItem('&kp COMMA','<\n,'),palItem('&kp PERIOD','>\n.'),
+    palItem('&kp SLASH','?\n/'),{r:'&kp RIGHT_SHIFT',l:'RShift',w:'w_lrsh',title:'Right Shift'},gap(79),
+    {r:'&kp UP',l:'Up',w:'w13'},gap(79),
+    {r:'&kp KP_NUMBER_1',l:'1',w:'w13'},{r:'&kp KP_NUMBER_2',l:'2',w:'w13'},{r:'&kp KP_NUMBER_3',l:'3',w:'w13'},{r:'&kp KP_EQUAL',l:'=',w:'w13'}
+  ],
+  [
+    {r:'&kp LEFT_CONTROL',l:'LCtrl',w:'w_lctrl',title:'Left Control'},{r:'&kp LWIN',l:'LGui',w:'w13',title:'Left GUI'},{r:'&kp LEFT_ALT',l:'LAlt',w:'w13'},
+    {r:'&kp SPACE',l:'Space',w:'w_space',title:'Space'},{r:'&kp RIGHT_ALT',l:'RAlt',w:'w13'},{r:'&kp RWIN',l:'RGui',w:'w13',title:'Right GUI'},
+    {r:'&kp K_MENU',l:'Menu',w:'w13',title:'Menu'},{r:'&kp RIGHT_CONTROL',l:'RCtrl',w:'w2',title:'Right Control'},gap(28),
+    {r:'&kp LEFT',l:'Left',w:'w13'},{r:'&kp DOWN',l:'Down',w:'w13'},{r:'&kp RIGHT',l:'Right',w:'w13'},gap(28),
+    {r:'&kp KP_NUMBER_0',l:'0',w:'w_np0'},{r:'&kp KP_DOT',l:'.',w:'w13'},{r:'&kp KP_ENTER',l:'Num\nEnter',w:'w13'}
+  ],
+  [
+    {r:'&none',l:'',title:'No output'},
+    {r:'&trans',l:'▽'},
+    palItem('&kp TILDE','~'),palItem('&kp EXCL','!'),palItem('&kp AT','@'),palItem('&kp HASH','#'),
+    palItem('&kp DLLR','$'),palItem('&kp PRCNT','%'),palItem('&kp CARET','^'),palItem('&kp AMPS','&'),
+    palItem('&kp ASTRK','*'),palItem('&kp LPAR','('),palItem('&kp RPAR',')'),palItem('&kp UNDER','_'),
+    palItem('&kp PLUS','+'),palItem('&kp LBRC','{'),palItem('&kp RBRC','}'),palItem('&kp LT','<'),
+    palItem('&kp GT','>'),palItem('&kp COLON',':'),palItem('&kp PIPE','|'),palItem('&kp QMARK','?'),palItem('&kp DQT','"'),
+    palItem('&kp LANGUAGE_1','Lang\n1'),palItem('&kp LANGUAGE_2','Lang\n2')
+  ],
+];
+
+// Legacy palette definitions kept for reference
+const QUANTUM_GROUPS=[];
+const PAL_CATS=[
+  {id:'basic',label:'蝓ｺ譛ｬ (QWERTY)',type:'qwerty'},
+  {id:'fn',label:'Fn',keys:Array.from({length:15},(_,i)=>({r:`&kp F${i+1}`,l:`F${i+1}`}))},
+  {id:'numpad',label:'繝・Φ繧ｭ繝ｼ',keys:[{r:'&kp KP_NUMBER_7',l:'K7'},{r:'&kp KP_NUMBER_8',l:'K8'},{r:'&kp KP_NUMBER_9',l:'K9'},{r:'&kp KP_PLUS',l:'K+'},{r:'&kp KP_NUMBER_4',l:'K4'},{r:'&kp KP_NUMBER_5',l:'K5'},{r:'&kp KP_NUMBER_6',l:'K6'},{r:'&kp KP_MINUS',l:'K-'},{r:'&kp KP_NUMBER_1',l:'K1'},{r:'&kp KP_NUMBER_2',l:'K2'},{r:'&kp KP_NUMBER_3',l:'K3'},{r:'&kp KP_ASTERISK',l:'K*'},{r:'&kp KP_NUMBER_0',l:'K0'},{r:'&kp KP_DOT',l:'K.'},{r:'&kp KP_DIVIDE',l:'K/'},{r:'&kp KP_NUMLOCK',l:'NLK'}]},
+  {id:'layer',label:'繝ｬ繧､繝､繝ｼ',keys:[{r:'&mo 1',l:'MO1'},{r:'&mo 2',l:'MO2'},{r:'&mo 3',l:'MO3'},{r:'&mo 4',l:'MO4'},{r:'&to 0',l:'TO0'},{r:'&to 1',l:'TO1'},{r:'&to 2',l:'TO2'},{r:'&to 3',l:'TO3'},{r:'&tog 1',l:'TG1'},{r:'&tog 2',l:'TG2'},{r:'&tap_dance_layer_1and2',l:'TD\n1&2'},{r:'&lt 1 SPACE',l:'LT1\nSPC'},{r:'&lt 2 SPACE',l:'LT2\nSPC'},{r:'&sl 1',l:'SL1'},{r:'&sl 2',l:'SL2'}]},
+  {id:'mouse',label:'繝槭え繧ｹ',keys:[{r:'&mkp LCLK',l:'MB1'},{r:'&mkp RCLK',l:'MB2'},{r:'&mkp MCLK',l:'MB3'},{r:'&mkp MB4',l:'MB4'},{r:'&mkp MB5',l:'MB5'}]},
+  {id:'bt',label:'BT',keys:[{r:'&bt BT_SEL 0',l:'BT0'},{r:'&bt BT_SEL 1',l:'BT1'},{r:'&bt BT_SEL 2',l:'BT2'},{r:'&bt BT_SEL 3',l:'BT3'},{r:'&bt BT_CLR',l:'CLR'},{r:'&bt BT_CLR_ALL',l:'CLRA'},{r:'&out OUT_TOG',l:'OUT'}]},
+  {id:'quantum',label:'Quantum',type:'quantum_grouped',groups:QUANTUM_GROUPS},
+  {id:'dyn',label:'繧ｹ繧ｱ繝ｼ繝ｫ',keys:[{r:'&zip_dyn_scale ZDS_XY ZDS_INC',l:'CUR\n+'},{r:'&zip_dyn_scale ZDS_XY ZDS_DEC',l:'CUR\n-'},{r:'&zip_dyn_scale ZDS_SC ZDS_INC',l:'SCL\n+'},{r:'&zip_dyn_scale ZDS_SC ZDS_DEC',l:'SCL\n-'},{r:'&zip_dyn_scale ZDS_ALL ZDS_RST',l:'RST\nALL'}]},
+  {id:'td_pal',label:'TapDance',type:'td'},
+];
+const BINDING_PICKER_CAT_IDS=['basic','layer','quantum','fn','mouse','app_media','bt','td_pal','macro_pal','dyn','custom','numpad_extra','system_keys','kbd_extra','kbd_app','intl_keys','consumer_keys','consumer_action','consumer_app','consumer_input'];
+const UI_QUANTUM_GROUPS=[
+  {label:'One Shot Mod',keys:[
+    palItem('&sk LSHIFT','OSM\nLSft','One-shot Left Shift'),
+    palItem('&sk LCTRL','OSM\nLCtl','One-shot Left Control'),
+    palItem('&sk LALT','OSM\nLAlt','One-shot Left Alt'),
+    palItem('&sk LGUI','OSM\nLGUI','One-shot Left GUI'),
+    palItem('&sk RSHIFT','OSM\nRSft','One-shot Right Shift'),
+    palItem('&sk RCTRL','OSM\nRCtl','One-shot Right Control'),
+    palItem('&sk RALT','OSM\nRAlt','One-shot Right Alt'),
+    palItem('&sk RGUI','OSM\nRGUI','One-shot Right GUI'),
+    palItem('&sk LS(LCTRL)','OSM\nCS','One-shot Left Ctrl + Left Shift'),
+    palItem('&sk LA(LCTRL)','OSM\nCA','One-shot Left Ctrl + Left Alt'),
+    palItem('&sk LG(LCTRL)','OSM\nCG','One-shot Left Ctrl + Left GUI'),
+    palItem('&sk LG(LS(LCTRL))','OSM\nCSG','One-shot Left Ctrl + Left Shift + Left GUI'),
+    palItem('&sk LA(LSHIFT)','OSM\nSA','One-shot Left Shift + Left Alt'),
+    palItem('&sk LG(LSHIFT)','OSM\nSG','One-shot Left Shift + Left GUI'),
+    palItem('&sk LG(LA(LSHIFT))','OSM\nSAG','One-shot Left Shift + Left Alt + Left GUI'),
+    palItem('&sk LG(LA(LCTRL))','OSM\nCAG','One-shot Left Ctrl + Left Alt + Left GUI'),
+    palItem('&sk LG(LALT)','OSM\nAG','One-shot Left Alt + Left GUI'),
+    palItem('&sk LS(LA(LCTRL))','OSM\nMeh','One-shot Left Ctrl + Left Shift + Left Alt'),
+    palItem('&sk LG(LS(LA(LCTRL)))','OSM\nHyper','One-shot Left Ctrl + Left Shift + Left Alt + Left GUI'),
+  ]},
+  {label:'Modified Key',keys:[
+    modWrap('LS','LSft','Left Shift + key'),
+    modWrap('LC','LCtl','Left Control + key'),
+    modWrap('LA','LAlt','Left Alt + key'),
+    modWrap('LG','LGUI','Left GUI + key'),
+    modWrap('RS','RSft','Right Shift + key'),
+    modWrap('RC','RCtl','Right Control + key'),
+    modWrap('RA','RAlt','Right Alt + key'),
+    modWrap('RG','RGUI','Right GUI + key'),
+    modWrap('LS(LC','LCS','Left Ctrl + Left Shift + key'),
+    modWrap('LA(LC','LCA','Left Ctrl + Left Alt + key'),
+    modWrap('LG(LC','LCG','Left Ctrl + Left GUI + key'),
+    modWrap('LG(LS(LC','LCSG','Left Ctrl + Left Shift + Left GUI + key'),
+    modWrap('LA(LS','LSA','Left Shift + Left Alt + key'),
+    modWrap('LG(LS','LSG','Left Shift + Left GUI + key'),
+    modWrap('LG(LA','LAG','Left Alt + Left GUI + key'),
+    modWrap('LG(LA(LC','LCAG','Left Ctrl + Left Alt + Left GUI + key'),
+    modWrap('LG(LA(LS','LSAG','Left Shift + Left Alt + Left GUI + key'),
+    modWrap('LS(LA(LC','Meh','Left Ctrl + Left Shift + Left Alt + key'),
+    modWrap('LG(LS(LA(LC','Hyper','Left Ctrl + Left Shift + Left Alt + Left GUI + key'),
+  ]},
+];
+const APP_MEDIA_KEYS=[
+  palItem('&kp LG(TAB)','Win\nTab','Windows task switcher'),
+  palItem('&kp LG(D)','Desk','Show desktop'),
+  palItem('&kp LG(L)','Lock','Lock Windows'),
+  palItem('&kp LG(E)','Expl','Open Explorer'),
+  palItem('&kp LG(R)','Run','Open Run dialog'),
+  palItem('&kp LC(LG(LEFT))','VDesk\nLeft','Move to previous virtual desktop'),
+  palItem('&kp LC(LG(RIGHT))','VDesk\nRight','Move to next virtual desktop'),
+  palItem('&kp LG(LC(LEFT))','Win\nLeft','Move active window to previous desktop'),
+  palItem('&kp LG(LC(RIGHT))','Win\nRight','Move active window to next desktop'),
+  palItem('&kp LC(LS(ESCAPE))','Task\nMgr','Open Task Manager'),
+  palItem('&kp LA(F4)','Alt\nF4','Close active window'),
+  palItem('&kp C_PLAY_PAUSE','Play','Play / Pause'),
+  palItem('&kp C_NEXT','Next','Next track'),
+  palItem('&kp C_PREV','Prev','Previous track'),
+  palItem('&kp C_VOL_UP','Vol+','Volume up'),
+  palItem('&kp C_VOL_DN','Vol-','Volume down'),
+  palItem('&kp C_MUTE','Mute','Mute'),
+  palItem('&kp C_BRI_UP','Bri+','Brightness up'),
+  palItem('&kp C_BRI_DN','Bri-','Brightness down'),
+];
+const SYSTEM_KEYCODES=[
+  'SYSTEM_POWER','SYSTEM_SLEEP','SYSTEM_WAKE_UP','SYSREQ',
+];
+const INTERNATIONAL_KEYCODES=[
+  'NON_US_HASH','NON_US_BACKSLASH',
+  'INTERNATIONAL_1','INTERNATIONAL_2','INTERNATIONAL_3','INTERNATIONAL_4','INTERNATIONAL_5',
+  'INTERNATIONAL_6','INTERNATIONAL_7','INTERNATIONAL_8','INTERNATIONAL_9',
+  'LANGUAGE_3','LANGUAGE_4','LANGUAGE_5','LANGUAGE_6','LANGUAGE_7','LANGUAGE_8','LANGUAGE_9',
+];
+const KEYPAD_EXTRA_KEYCODES=[
+  'CLEAR2','KP_EQUAL_AS400','KP_LEFT_PARENTHESIS','KP_RIGHT_PARENTHESIS','KP_CLEAR',
+];
+const KEYBOARD_EXTRA_KEYCODES=[
+  'TILDE2','PIPE2','LOCKING_CAPS','LOCKING_NUM','LOCKING_SCROLL',
+  'ALT_ERASE','CLEAR','PRIOR','RETURN2','SEPARATOR','OUT','OPER',
+  'CLEAR_AGAIN','CRSEL','EXSEL','CURU','KSPC',
+];
+const KEYBOARD_APP_KEYCODES=[
+  'K_APPLICATION','K_POWER','K_EXECUTE','K_HELP','K_SELECT','K_STOP',
+  'K_AGAIN','K_UNDO','K_CUT','K_COPY','K_PASTE','K_FIND',
+  'K_MUTE','K_VOLUME_UP','K_VOLUME_DOWN','K_CANCEL',
+  'K_PLAY_PAUSE','K_STOP2','K_PREVIOUS','K_NEXT','K_EJECT',
+  'K_VOLUME_UP2','K_VOLUME_DOWN2','K_MUTE2',
+  'K_WWW','K_BACK','K_FORWARD','K_STOP3','K_FIND2',
+  'K_SCROLL_UP','K_SCROLL_DOWN','K_EDIT','K_SLEEP','K_LOCK',
+  'K_REFRESH','K_CALCULATOR',
+];
+const CONSUMER_KEYCODES=[
+  'C_POWER','C_RESET','C_SLEEP','C_SLEEP_MODE','C_MENU','C_MENU_PICK',
+  'C_MENU_UP','C_MENU_DOWN','C_MENU_LEFT','C_MENU_RIGHT','C_MENU_ESCAPE',
+  'C_MENU_INCREASE','C_MENU_DECREASE','C_DATA_ON_SCREEN','C_CAPTIONS',
+  'C_SNAPSHOT','C_PIP','C_RED_BUTTON','C_GREEN_BUTTON','C_BLUE_BUTTON',
+  'C_YELLOW_BUTTON','C_ASPECT','C_BACKLIGHT_TOGGLE',
+  'C_BRIGHTNESS_MINIMUM','C_BRIGHTNESS_MAXIMUM','C_BRIGHTNESS_AUTO',
+  'C_MEDIA_STEP','C_RECALL_LAST','C_MEDIA_COMPUTER','C_MEDIA_TV',
+  'C_MEDIA_WWW','C_MEDIA_DVD','C_MEDIA_PHONE','C_MEDIA_GUIDE',
+  'C_MEDIA_VIDEOPHONE','C_MEDIA_GAMES','C_MEDIA_MESSAGES','C_MEDIA_CD',
+  'C_MEDIA_VCR','C_MEDIA_TUNER','C_QUIT','C_HELP','C_MEDIA_TAPE',
+  'C_MEDIA_CABLE','C_MEDIA_SATELLITE','C_MEDIA_HOME','C_CHANNEL_INC',
+  'C_CHANNEL_DEC','C_MEDIA_VCR_PLUS','C_PLAY','C_PAUSE','C_RECORD',
+  'C_FAST_FORWARD','C_REWIND','C_STOP','C_EJECT','C_RANDOM_PLAY',
+  'C_REPEAT','C_SLOW_TRACKING','C_STOP_EJECT','C_VOICE_COMMAND',
+  'C_BASS_BOOST','C_SLOW','C_ALTERNATE_AUDIO_INCREMENT',
+];
+const CONSUMER_APP_KEYCODES=[
+  'C_AL_CCC','C_AL_WORD','C_AL_TEXT_EDITOR','C_AL_SPREADSHEET',
+  'C_AL_GRAPHICS_EDITOR','C_AL_PRESENTATION','C_AL_DATABASE','C_AL_EMAIL',
+  'C_AL_NEWS','C_AL_VOICEMAIL','C_AL_CONTACTS','C_AL_CALENDAR',
+  'C_AL_TASK_MANAGER','C_AL_JOURNAL','C_AL_FINANCE','C_AL_CALCULATOR',
+  'C_AL_AV_CAPTURE_PLAYBACK','C_AL_MY_COMPUTER','C_AL_WWW',
+  'C_AL_NETWORK_CHAT','C_AL_LOGOFF','C_AL_LOCK','C_AL_CONTROL_PANEL',
+  'C_AL_SELECT_TASK','C_AL_NEXT_TASK','C_AL_PREVIOUS_TASK','C_AL_HELP',
+  'C_AL_DOCUMENTS','C_AL_SPELLCHECK','C_AL_KEYBOARD_LAYOUT',
+  'C_AL_SCREEN_SAVER','C_AL_FILE_BROWSER','C_AL_IMAGE_BROWSER',
+  'C_AL_AUDIO_BROWSER','C_AL_MOVIE_BROWSER','C_AL_INSTANT_MESSAGING',
+  'C_AL_OEM_FEATURES',
+];
+const CONSUMER_ACTION_KEYCODES=[
+  'C_AC_NEW','C_AC_OPEN','C_AC_CLOSE','C_AC_EXIT','C_AC_SAVE',
+  'C_AC_PRINT','C_AC_PROPERTIES','C_AC_UNDO','C_AC_COPY','C_AC_CUT',
+  'C_AC_PASTE','C_AC_FIND','C_AC_SEARCH','C_AC_GOTO','C_AC_HOME',
+  'C_AC_BACK','C_AC_FORWARD','C_AC_STOP','C_AC_REFRESH',
+  'C_AC_BOOKMARKS','C_AC_ZOOM_IN','C_AC_ZOOM_OUT','C_AC_ZOOM',
+  'C_AC_VIEW_TOGGLE','C_AC_SCROLL_UP','C_AC_SCROLL_DOWN','C_AC_EDIT',
+  'C_AC_CANCEL','C_AC_INSERT','C_AC_DEL','C_AC_REDO','C_AC_REPLY',
+  'C_AC_FORWARD_MAIL','C_AC_SEND','C_AC_DESKTOP_SHOW_ALL_WINDOWS',
+  'C_AC_DESKTOP_SHOW_ALL_APPLICATIONS','C_AC_NEXT_KEYBOARD_LAYOUT_SELECT',
+];
+const CONSUMER_INPUT_ASSIST_KEYCODES=[
+  'C_KEYBOARD_INPUT_ASSIST_PREVIOUS','C_KEYBOARD_INPUT_ASSIST_NEXT',
+  'C_KEYBOARD_INPUT_ASSIST_PREVIOUS_GROUP','C_KEYBOARD_INPUT_ASSIST_NEXT_GROUP',
+  'C_KEYBOARD_INPUT_ASSIST_ACCEPT','C_KEYBOARD_INPUT_ASSIST_CANCEL',
+];
+const MODIFIER_KEY_GROUPS=[
+  {label:'Single Mod',keys:[
+    mtFieldChoice('LEFT_SHIFT','LSft','Left Shift'),
+    mtFieldChoice('LEFT_CONTROL','LCtl','Left Control'),
+    mtFieldChoice('LEFT_ALT','LAlt','Left Alt'),
+    mtFieldChoice('LEFT_GUI','LGUI','Left GUI'),
+    mtFieldChoice('RIGHT_SHIFT','RSft','Right Shift'),
+    mtFieldChoice('RIGHT_CONTROL','RCtl','Right Control'),
+    mtFieldChoice('RIGHT_ALT','RAlt','Right Alt'),
+    mtFieldChoice('RIGHT_GUI','RGUI','Right GUI'),
+  ]},
+  {label:'Combo Mod',keys:[
+    mtFieldChoice('LS(LCTRL)','LCS','Left Ctrl + Left Shift'),
+    mtFieldChoice('LA(LCTRL)','LCA','Left Ctrl + Left Alt'),
+    mtFieldChoice('LG(LCTRL)','LCG','Left Ctrl + Left GUI'),
+    mtFieldChoice('LG(LS(LCTRL))','LCSG','Left Ctrl + Left Shift + Left GUI'),
+    mtFieldChoice('LA(LSHIFT)','LSA','Left Shift + Left Alt'),
+    mtFieldChoice('LG(LSHIFT)','LSG','Left Shift + Left GUI'),
+    mtFieldChoice('LG(LALT)','LAG','Left Alt + Left GUI'),
+    mtFieldChoice('LG(LA(LCTRL))','LCAG','Left Ctrl + Left Alt + Left GUI'),
+    mtFieldChoice('LG(LA(LSHIFT))','LSAG','Left Shift + Left Alt + Left GUI'),
+    mtFieldChoice('LS(LA(LCTRL))','Meh','Left Ctrl + Left Shift + Left Alt'),
+    mtFieldChoice('LG(LS(LA(LCTRL)))','Hyper','Left Ctrl + Left Shift + Left Alt + Left GUI'),
+  ]},
+];
+function getLayerPaletteRows(){
+  const layers=getLayerIndices();
+  const upperLayers=layers.filter(n=>n>0);
+  return [
+    [
+      ...upperLayers.map(n=>({
+        r:`&mo ${n}`,
+        l:`MO${n}`,
+        title:n===1||n===2 ? `Momentarily activates layer ${n} while held. ${getConditionalLayerHint()}` : `Momentarily activates layer ${n} while held.`,
+      })),
+    ],
+    [
+      {r:'&tog 0',l:'TG0',title:'Toggles layer 0 on or off.'},
+      ...upperLayers.map(n=>({r:`&tog ${n}`,l:`TG${n}`,title:`Toggles layer ${n} on or off.`})),
+      ...layers.map(n=>({r:`&sl ${n}`,l:`SL${n}`,title:`Sticky layer ${n}; applies to the next key press only. ZMK uses &sl here, which is the QMK OSL equivalent.`})),
+      ...layers.map(n=>({r:`&to ${n}`,l:`TO${n}`,title:`Turns to layer ${n} and deactivates the others.`})),
+    ],
+    [
+      ...layers.map(n=>({r:`&lt ${n} ${MOD_PH}`,l:`LT ${n}\n(kc)`,title:`Tap sends a key, hold momentarily activates layer ${n}.`})),
+    ],
+  ];
+}
+const PALETTE_CATS=[
+  {id:'basic',label:'Basic',type:'qwerty'},
+  {id:'layer',label:'Layers',type:'layer_dynamic'},
+  {id:'quantum',label:'Quantum',type:'quantum_grouped',groups:UI_QUANTUM_GROUPS},
+  {id:'fn',label:'Fn',wrap:true,keys:Array.from({length:24},(_,i)=>({r:'&kp F'+(i+1),l:'F'+(i+1)}))},
+  {id:'mouse',label:'Mouse',wrap:true,keys:[{r:'&mkp LCLK',l:'MB1'},{r:'&mkp RCLK',l:'MB2'},{r:'&mkp MCLK',l:'MB3'},{r:'&mkp MB4',l:'MB4'},{r:'&mkp MB5',l:'MB5'}]},
+  {id:'app_media',label:'App / Media',wrap:true,keys:APP_MEDIA_KEYS},
+  {id:'bt',label:'BT',keys:[{r:'&bt BT_SEL 0',l:'BT0'},{r:'&bt BT_SEL 1',l:'BT1'},{r:'&bt BT_SEL 2',l:'BT2'},{r:'&bt BT_SEL 3',l:'BT3'},{r:'&bt BT_CLR',l:'CLR'},{r:'&bt BT_CLR_ALL',l:'CLRA'},{r:'&out OUT_TOG',l:'OUT'}]},
+  {id:'td_pal',label:'TapDance',type:'td'},
+  {id:'macro_pal',label:'Macro',type:'macro'},
+  {id:'dyn',label:'Scale',keys:[{r:'&zip_dyn_scale ZDS_XY ZDS_INC',l:'CUR\n+'},{r:'&zip_dyn_scale ZDS_XY ZDS_DEC',l:'CUR\n-'},{r:'&zip_dyn_scale ZDS_SC ZDS_INC',l:'SCL\n+'},{r:'&zip_dyn_scale ZDS_SC ZDS_DEC',l:'SCL\n-'},{r:'&zip_dyn_scale ZDS_ALL ZDS_RST',l:'RST\nALL'}]},
+  {id:'numpad_extra',label:'Numpad+',wrap:true,keys:kpCodeItems(KEYPAD_EXTRA_KEYCODES)},
+  {id:'system_keys',label:'System',wrap:true,keys:kpCodeItems(SYSTEM_KEYCODES)},
+  {id:'kbd_extra',label:'Keyboard+',wrap:true,keys:kpCodeItems(KEYBOARD_EXTRA_KEYCODES)},
+  {id:'kbd_app',label:'Keyboard App',wrap:true,keys:kpCodeItems(KEYBOARD_APP_KEYCODES)},
+  {id:'intl_keys',label:'Intl / Lang',wrap:true,keys:kpCodeItems(INTERNATIONAL_KEYCODES)},
+  {id:'consumer_keys',label:'Consumer',wrap:true,keys:kpCodeItems(CONSUMER_KEYCODES)},
+  {id:'consumer_action',label:'Consumer Action',wrap:true,keys:kpCodeItems(CONSUMER_ACTION_KEYCODES)},
+  {id:'consumer_app',label:'Consumer App',wrap:true,keys:kpCodeItems(CONSUMER_APP_KEYCODES)},
+  {id:'consumer_input',label:'Input Assist',wrap:true,keys:kpCodeItems(CONSUMER_INPUT_ASSIST_KEYCODES)},
+];
+const DEFAULT_BINDING_CAT_IDS=['basic','layer','quantum','fn','mouse','app_media','bt','td_pal','macro_pal','dyn','custom','numpad_extra','system_keys','kbd_extra','kbd_app','intl_keys','consumer_keys','consumer_action','consumer_app','consumer_input'];
+const KEYCODE_CONTEXT_CAT_IDS=['basic','fn','numpad_extra'];
+
+// パレット定義から raw → label の逆引きマップを構築
+// bindingLabel() がこれを最優先で参照することで、キーマップ表示がパレット表示と一致する
+const PAL_LABEL = (()=>{
+  const map = {};
+  const add = (r, l) => { if(r && l != null && l !== '') map[r.trim()] = l; };
+  QWERTY_ROWS.flat().forEach(k => { if(k.r !== undefined && k.l !== undefined) add(k.r, k.l); });
+  PALETTE_CATS.forEach(cat => {
+    (cat.keys||[]).forEach(k => { if(k.r !== undefined && k.l !== undefined) add(k.r, k.l); });
+    (cat.groups||[]).forEach(g => (g.keys||[]).forEach(k => { if(k.r !== undefined && k.l !== undefined) add(k.r, k.l); }));
+  });
+  return map;
+})();
+const MODIFIER_CONTEXT_CATS=[{id:'modifier_keys',label:'Modifiers',type:'quantum_grouped',groups:MODIFIER_KEY_GROUPS}];
+
+// 笏笏 繝医Λ繝・け繝代ャ繝芽ｨｭ螳壹せ繧ｭ繝ｼ繝・笏笏
+const TP_SCHEMA=[
+  {title:'Sensor',rows:[
+    {key:'CONFIG_INPUT_IQS9151_RESOLUTION_X',label:'Resolution X',type:'num',min:100,max:4096,desc:'X軸の分解能（100〜4096）。値が高いほど細かい動きを検出します。高すぎるとノイズが増えることがあります。'},
+    {key:'CONFIG_INPUT_IQS9151_RESOLUTION_Y',label:'Resolution Y',type:'num',min:100,max:4096,desc:'Y軸の分解能（100〜4096）。値が高いほど細かい動きを検出します。高すぎるとノイズが増えることがあります。'},
+    {key:'CONFIG_INPUT_IQS9151_ATI_TARGETCOUNT',label:'ATI Target Count',type:'num',desc:'ATIキャリブレーションのターゲットカウント値。センサーの感度を初期化する際の基準値です。通常は変更不要です。'},
+    {key:'_ROTATE',label:'Rotation',type:'rotate',desc:'タッチパッドの入力方向の回転角度。本体への取り付け方向に合わせて設定してください。'},
+  ]},
+  {title:'Dynamic Filter',rows:[
+    {key:'CONFIG_INPUT_IQS9151_DYNAMIC_FILTER_BOTTOM_SPEED',label:'Bottom Speed',type:'num',desc:'動的フィルターが最大強度で掛かるカーソル速度の下限値。この速度以下では最も強くスムージングされます。'},
+    {key:'CONFIG_INPUT_IQS9151_DYNAMIC_FILTER_TOP_SPEED',label:'Top Speed',type:'num',desc:'動的フィルターが無効になるカーソル速度の上限値。この速度以上ではフィルタリングなしで生の入力が使われます。'},
+    {key:'CONFIG_INPUT_IQS9151_DYNAMIC_FILTER_BOTTOM_BETA',label:'Bottom Beta',type:'num',desc:'低速時に適用されるフィルター強度。値が小さいほど強くフィルタリングされ動きが滑らかになります。値が大きいほど応答が速くなります。'},
+  ]},
+  {title:'1 Finger Gesture',rows:[
+    {key:'CONFIG_INPUT_IQS9151_1F_TAP_ENABLE',label:'Tap Enable',type:'bool',desc:'1本指タップを左クリックとして認識する機能の有効/無効。'},
+    {key:'CONFIG_INPUT_IQS9151_1F_TAP_MAX_MS',label:'Tap Max (ms)',type:'num',desc:'タップと認識される最大接触時間（ms）。これより長く触れると長押しやドラッグとして処理されます。'},
+    {key:'CONFIG_INPUT_IQS9151_1F_TAP_MOVE',label:'Tap Move Limit',type:'num',desc:'タップ中に許容される最大移動量。この値を超えて指が動くとタップではなくカーソル移動と判定されます。'},
+    {key:'CONFIG_INPUT_IQS9151_1F_PRESSHOLD_ENABLE',label:'Press Hold Enable',type:'bool',desc:'1本指の長押しを右クリック（またはカスタム動作）として認識する機能の有効/無効。'},
+    {key:'CONFIG_INPUT_IQS9151_1F_TAPDRAG_GAP_MAX_MS',label:'Tap Drag Gap (ms)',type:'num',desc:'タップ直後にドラッグを開始するまでの最大待機時間（ms）。この時間内に再度タッチするとドラッグと認識します。'},
+  ]},
+  {title:'Cursor Inertia',rows:[
+    {key:'CONFIG_INPUT_IQS9151_CURSOR_INERTIA_ENABLE',label:'Enable',type:'bool',desc:'カーソル慣性機能の有効/無効。有効にすると指を離した後もカーソルが滑らかに減速しながら動き続けます。'},
+    {key:'CONFIG_INPUT_IQS9151_CURSOR_INERTIA_DECAY',label:'Decay',type:'num',min:0,max:1000,desc:'慣性の減衰率（0〜1000）。値が大きいほど長く滑り続け、小さいほどすぐ止まります。'},
+    {key:'CONFIG_INPUT_IQS9151_CURSOR_INERTIA_RECENT_WINDOW_MS',label:'Recent Window (ms)',type:'num',desc:'慣性の初速計算に使用する直近のサンプル時間窓（ms）。この時間内の動きから初速が算出されます。'},
+    {key:'CONFIG_INPUT_IQS9151_CURSOR_INERTIA_STALE_GAP_MS',label:'Stale Gap (ms)',type:'num',desc:'この時間以上動きが止まっていた場合、慣性計算用データをリセットします（ms）。フリック前に少し止まった場合に慣性が誤発動しないようにします。'},
+    {key:'CONFIG_INPUT_IQS9151_CURSOR_INERTIA_MIN_SAMPLES',label:'Min Samples',type:'num',desc:'慣性を発動させるために必要な最小サンプル数。サンプルが少なすぎる場合は慣性を発動させません。'},
+    {key:'CONFIG_INPUT_IQS9151_CURSOR_INERTIA_MIN_AVG_SPEED',label:'Min Avg Speed',type:'num',desc:'慣性を発動させるための最小平均速度。この速度以下のゆっくりした動きでは指を離しても慣性が働きません。'},
+  ]},
+  {title:'2 Finger Gesture',rows:[
+    {key:'CONFIG_INPUT_IQS9151_2F_TAP_ENABLE',label:'Tap Enable',type:'bool',desc:'2本指タップを右クリックとして認識する機能の有効/無効。'},
+    {key:'CONFIG_INPUT_IQS9151_2F_TAP_MAX_MS',label:'Tap Max (ms)',type:'num',desc:'2本指タップと認識される最大接触時間（ms）。これより長いと別の動作として処理されます。'},
+    {key:'CONFIG_INPUT_IQS9151_2F_TAP_MOVE',label:'Tap Move Limit',type:'num',desc:'2本指タップ中に許容される最大移動量。これを超えるとスクロール開始と判定されます。'},
+    {key:'CONFIG_INPUT_IQS9151_2F_PRESSHOLD_ENABLE',label:'Press Hold Enable',type:'bool',desc:'2本指長押しを認識する機能の有効/無効。'},
+    {key:'CONFIG_INPUT_IQS9151_SCROLL_Y_ENABLE',label:'Vertical Scroll',type:'bool',desc:'2本指の上下スワイプで縦スクロールを行う機能の有効/無効。'},
+    {key:'CONFIG_INPUT_IQS9151_SCROLL_X_ENABLE',label:'Horizontal Scroll',type:'bool',desc:'2本指の左右スワイプで横スクロールを行う機能の有効/無効。'},
+    {key:'CONFIG_INPUT_IQS9151_2F_SCROLL_START_MOVE',label:'Scroll Start Move',type:'num',desc:'スクロールと認識される最小移動量。小さいほど少し動かすだけでスクロールが始まります。大きくすると誤スクロールを防げます。'},
+  ]},
+  {title:'Scroll Inertia',rows:[
+    {key:'CONFIG_INPUT_IQS9151_SCROLL_INERTIA_ENABLE',label:'Enable',type:'bool',desc:'スクロール慣性機能の有効/無効。有効にすると指を離した後もスクロールが滑らかに減速しながら続きます。'},
+    {key:'CONFIG_INPUT_IQS9151_SCROLL_INERTIA_DECAY',label:'Decay',type:'num',min:0,max:1000,desc:'スクロール慣性の減衰率（0〜1000）。値が大きいほど長く慣性スクロールし、小さいほどすぐ止まります。'},
+    {key:'CONFIG_INPUT_IQS9151_SCROLL_INERTIA_RECENT_WINDOW_MS',label:'Recent Window (ms)',type:'num',desc:'スクロール慣性の初速計算に使用する時間窓（ms）。'},
+    {key:'CONFIG_INPUT_IQS9151_SCROLL_INERTIA_STALE_GAP_MS',label:'Stale Gap (ms)',type:'num',desc:'この時間以上スクロールが止まっていた場合、慣性データをリセットします（ms）。'},
+    {key:'CONFIG_INPUT_IQS9151_SCROLL_INERTIA_MIN_SAMPLES',label:'Min Samples',type:'num',desc:'スクロール慣性を発動させるために必要な最小サンプル数。'},
+    {key:'CONFIG_INPUT_IQS9151_SCROLL_INERTIA_MIN_AVG_SPEED',label:'Min Avg Speed',type:'num',desc:'スクロール慣性を発動させるための最小平均速度。この速度以下ではゆっくり指を離しても慣性が働きません。'},
+  ]},
+  {title:'2 Finger Pinch',rows:[
+    {key:'CONFIG_INPUT_IQS9151_2F_PINCH_ENABLE',label:'Enable',type:'bool',desc:'2本指ピンチジェスチャーの有効/無効。ピンチはマウスホイール入力（ズームなど）として送出されます。'},
+    {key:'CONFIG_INPUT_IQS9151_2F_PINCH_START_DISTANCE',label:'Start Distance',type:'num',desc:'ピンチとして認識される指間距離の変化量の閾値。この値以上の変化が検出されるとピンチと判定されます。'},
+    {key:'CONFIG_INPUT_IQS9151_2F_PINCH_WHEEL_GAIN_X10',label:'Wheel Gain x10',type:'num',desc:'ピンチをホイール入力に変換する際のゲイン（実際の値の10倍で指定）。値が大きいほどわずかなピンチで大きくスクロール/ズームします。'},
+  ]},
+  {title:'3 Finger Gesture',rows:[
+    {key:'CONFIG_INPUT_IQS9151_3F_TAP_ENABLE',label:'Tap Enable',type:'bool',desc:'3本指タップを認識する機能の有効/無効。'},
+    {key:'CONFIG_INPUT_IQS9151_3F_TAP_MAX_MS',label:'Tap Max (ms)',type:'num',desc:'3本指タップと認識される最大接触時間（ms）。'},
+    {key:'CONFIG_INPUT_IQS9151_3F_TAP_MOVE',label:'Tap Move Limit',type:'num',desc:'3本指タップ中に許容される最大移動量。この値を超えるとスワイプとして処理されます。'},
+    {key:'CONFIG_INPUT_IQS9151_3F_PRESSHOLD_ENABLE',label:'Press Hold Enable',type:'bool',desc:'3本指の長押しを認識する機能の有効/無効。'},
+    {key:'CONFIG_INPUT_IQS9151_3F_TAPDRAG_GAP_MAX_MS',label:'Tap Drag Gap (ms)',type:'num',desc:'3本指タップ後にドラッグを開始するまでの最大待機時間（ms）。'},
+    {key:'CONFIG_INPUT_IQS9151_3F_SWIPE_THRESHOLD',label:'Swipe Threshold',type:'num',desc:'3本指スワイプと認識される最小移動量。小さいほど少し動かすだけでスワイプが発動します。'},
+  ]},
+];
+const MAIN_SCHEMA=[
+  {title:'Power',rows:[
+    {key:'CONFIG_ZMK_SLEEP',label:'Sleep Enable',type:'bool',desc:'一定時間操作がない場合に省電力スリープモードへ移行する機能の有効/無効。バッテリー駆動時間を延ばします。'},
+    {key:'CONFIG_ZMK_IDLE_TIMEOUT',label:'Idle Timeout (ms)',type:'num',desc:'アイドル状態（軽いスリープ）に移行するまでの無操作待機時間（ms）。この間はBLEアドバタイズなどが停止します。'},
+    {key:'CONFIG_ZMK_IDLE_SLEEP_TIMEOUT',label:'Sleep Timeout (ms)',type:'num',desc:'アイドル状態になってからディープスリープに移行するまでの追加待機時間（ms）。ディープスリープ中はキー入力でのみ復帰します。'},
+    {key:'CONFIG_ZMK_SETTINGS_SAVE_DEBOUNCE',label:'Settings Save Debounce (ms)',type:'num',desc:'設定変更後にフラッシュへ書き込むまでの待機時間（ms）。短すぎると書き込み回数が増えてフラッシュ寿命に影響します。通常は1000〜5000ms推奨。'},
+  ]},
+  {title:'Bluetooth',rows:[
+    {key:'CONFIG_BT_BAS',label:'Battery Service Enable',type:'bool',desc:'Bluetooth Battery Service（BAS）の有効/無効。有効にするとホストOSにバッテリー残量を通知できます。'},
+  ]},
+  {title:'LED',rows:[
+    {key:'CONFIG_RGBLED_WIDGET_BATTERY_LEVEL_CRITICAL',label:'Battery Critical (%)',type:'num',min:1,max:100,desc:'LEDが「バッテリー残量危険」を示す色に点灯する閾値（%）。この値以下になると警告表示します。'},
+    {key:'CONFIG_RGBLED_WIDGET_BATTERY_LEVEL_HIGH',label:'Battery High (%)',type:'num',min:1,max:100,desc:'LEDが「バッテリー残量良好」を示す色に点灯する閾値（%）。この値以上で良好表示します。'},
+    {key:'CONFIG_RGBLED_WIDGET_SHOW_LAYER_CHANGE',label:'Show Layer Change',type:'bool',desc:'レイヤー切り替え時にLEDを一時点滅させて通知する機能の有効/無効。現在のレイヤーを色で視覚的に確認できます。'},
+  ]},
+  {title:'ZMK Studio',rows:[
+    {key:'CONFIG_ZMK_STUDIO',label:'Studio Enable',type:'bool',desc:'ZMK StudioアプリからUSB/BLE経由でリアルタイムにキーマップを編集・書き換える機能の有効/無効。有効にするとファームウェア再書き込みなしでキーマップ変更が可能です。'},
+    {key:'CONFIG_ZMK_STUDIO_LOCKING',label:'Studio Locking',type:'bool',desc:'ZMK Studioからの接続をロックする機能の有効/無効。有効にすると特定の操作（解除キーなど）なしにStudioから設定変更できなくなります。'},
+  ]},
+  {title:'Mouse Smooth Scroll',rows:[
+    {key:'CONFIG_ZMK_POINTING_SMOOTH_SCROLLING',label:'Enable',type:'bool',desc:'トラックパッドのスクロール入力を滑らかに補間する機能の有効/無効。有効にすると慣性スクロールと組み合わせてより自然なスクロール感になります。'},
+  ]},
+];
+function macroEmpty(i){ return {label:`mc${i}`,display_name:'',steps:[]}; }
+const state={
+  layers:[],currentLayer:0,
+  tpSide:'left',tpConfigs:{left:{},right:{}},mainConfig:{},
+  combos:[],
+  conditionalLayers:[],
+  tdDefs:Array.from({length:TD_COUNT},()=>tdEmpty()),
+  macroDefs:Array.from({length:MACRO_COUNT},(_,i)=>macroEmpty(i)),
+  settingsMeta:{firmware_folder:'',per_folder_macros:{}},
+  macroSelectedSlot:0,
+  tdSelectedSlot:0,
+  activePalCat:'basic',unsaved:false,editIdx:-1,
+  currentTab:'keymap',
+  paletteContext:null,
+};
+
+// 笏笏 API / Status 笏笏
+async function api(url,method='GET',body=null){
+  const o={method,headers:{'Content-Type':'application/json'}};
+  if(body) o.body=JSON.stringify(body);
+  return (await fetch(url,o)).json();
+}
+function setStatus(msg,cls=''){ const el=document.getElementById('status-msg'); el.textContent=msg; el.className=cls; }
+function saveSuccessMessage(tdModuleStatus){
+  if(tdModuleStatus==='installed') return 'Saved all changes. TD module was installed automatically.';
+  if(tdModuleStatus==='already_present') return 'Saved all changes. TD module is already available.';
+  return 'Saved all changes.';
+}
+function setHoverCode(raw=''){
+  const el=document.getElementById('status-hover');
+  if(el) el.textContent=raw||'';
+}
+function emptyMacroDefs(){ return Array.from({length:MACRO_COUNT},(_,i)=>macroEmpty(i)); }
+function applySettingsMeta(settings={}){
+  state.settingsMeta={
+    firmware_folder:settings.firmware_folder||'',
+    per_folder_macros:settings.per_folder_macros||{},
+  };
+  syncMacroRestoreControls();
+}
+async function refreshSettingsMeta(){
+  const s=await api('/api/settings');
+  applySettingsMeta(s);
+  return s;
+}
+function countConfiguredMacros(macros){
+  return (macros||[]).filter(m=>Array.isArray(m?.steps)&&m.steps.length).length;
+}
+function getMacroRestorePaths(){
+  const current=state.settingsMeta?.firmware_folder||'';
+  return Object.keys(state.settingsMeta?.per_folder_macros||{})
+    .filter(path=>path&&path!==current)
+    .sort((a,b)=>a.localeCompare(b));
+}
+function syncMacroRestoreControls(){
+  const select=document.getElementById('macro-restore-select');
+  const btn=document.getElementById('macro-restore-btn');
+  const current=document.getElementById('macro-current-path');
+  if(!select||!btn||!current) return;
+
+  const currentPath=state.settingsMeta?.firmware_folder||'';
+  current.textContent=currentPath ? `現在: ${currentPath}` : '現在のフォルダ未設定';
+  current.title=currentPath||'';
+
+  const prevValue=select.value;
+  const paths=getMacroRestorePaths();
+  select.innerHTML='';
+
+  const placeholder=document.createElement('option');
+  placeholder.value='';
+  placeholder.textContent=paths.length ? '復元元のフォルダを選択' : '復元できる保存済みフォルダはありません';
+  select.appendChild(placeholder);
+
+  paths.forEach(path=>{
+    const opt=document.createElement('option');
+    const macroCount=countConfiguredMacros(state.settingsMeta.per_folder_macros[path]);
+    opt.value=path;
+    opt.textContent=`${path} (${macroCount} macro${macroCount!==1?'s':''})`;
+    opt.title=path;
+    select.appendChild(opt);
+  });
+
+  if(paths.includes(prevValue)) select.value=prevValue;
+  btn.disabled=!paths.length;
+  select.disabled=!paths.length;
+}
+function bindHoverCode(el, raw){
+  if(!el) return;
+  el.addEventListener('mouseenter',()=>setHoverCode(raw||''));
+  el.addEventListener('mouseleave',()=>setHoverCode(''));
+}
+function markUnsaved(){ state.unsaved=true; document.getElementById('unsaved-dot').classList.remove('d-none'); }
+function markSaved(){ state.unsaved=false; document.getElementById('unsaved-dot').classList.add('d-none'); }
+function needsFollowUpPicker(raw){ return !!raw && raw.includes(MOD_PH); }
+function isModifierKeycode(name){
+  return [
+    'LEFT_SHIFT','RIGHT_SHIFT','LEFT_CONTROL','RIGHT_CONTROL',
+    'LEFT_ALT','RIGHT_ALT','LEFT_GUI','RIGHT_GUI',
+    'LSHIFT','RSHIFT','LCTRL','RCTRL','LALT','RALT','LGUI','RGUI',
+    'LWIN','RWIN'
+  ].includes(name||'');
+}
+function bindingBehavior(raw){
+  const s=(raw||'').trim();
+  if(!s.startsWith('&')) return '';
+  return s.replace(/^&/,'').split(/\s+/)[0];
+}
+function isTapDanceFieldSafe(field, raw){
+  const s=normalizeTdBinding(raw);
+  if(!s) return false;
+  const beh=bindingBehavior(s);
+  if(TD_PUBLIC_RE.test(s)) return false;
+  if(/^td\d+s$/.test(beh)) return false;
+  return true;
+}
+function isTapDanceFieldComplete(field, raw){
+  const s=normalizeTdBinding(raw);
+  return !!s && !s.includes(MOD_PH) && isTapDanceFieldSafe(field, s);
+}
+function tapDanceFieldWarn(field){
+  return `${tdFieldMeta(field).label} には有効な binding を設定してください。Quantum の modified key を選んだ場合は追加キーまで選んでください。&tdN は設定できません。`;
+}
+function completeTemplateBinding(template, pickedRaw){
+  const key=extractKeyName(pickedRaw);
+  return key ? repairQuantumModifiedBinding(template.replace(MOD_PH, key)) : '';
+}
+function openTemplateFollowUpPicker(opts){
+  activatePaletteContext({
+    tab:opts.tab,
+    title:opts.title || 'Choose the follow-up key',
+    note:opts.note || 'Choose the key to combine with the selected behavior from the palette below.',
+    catIds:KEYCODE_CONTEXT_CAT_IDS,
+    initialCat:'basic',
+    target:opts.target,
+    onPick:(pickedRaw)=>{
+      const completed=completeTemplateBinding(opts.template, pickedRaw);
+      if(!completed) return;
+      opts.onComplete(completed);
+      if(opts.onAfterComplete) opts.onAfterComplete(completed);
+      else clearPaletteContext();
+    },
+  });
+}
+function getPaletteCatsByIds(catIds){
+  return catIds.map(id=>PALETTE_CATS.find(cat=>cat.id===id)).filter(Boolean);
+}
+function orderPaletteCats(cats){
+  const orderedIds=DEFAULT_BINDING_CAT_IDS;
+  const byId=new Map((cats||[]).map(cat=>[cat.id,cat]));
+  const ordered=orderedIds.map(id=>byId.get(id)).filter(Boolean);
+  const rest=(cats||[]).filter(cat=>!orderedIds.includes(cat.id));
+  return [...ordered,...rest];
+}
+function getActivePaletteCats(){
+  return orderPaletteCats(state.paletteContext?.cats || PALETTE_CATS);
+}
+let _paletteLayoutRaf=0;
+function syncPaletteSlotLayout(){
+  document.querySelectorAll('.tab-palette-slot').forEach(slot=>slot.style.removeProperty('--palette-slot-size'));
+  const targetTab=state.paletteContext?.tab || 'keymap';
+  const slot=document.getElementById(`pal-slot-${targetTab}`);
+  if(!slot || !slot.classList.contains('active')) return;
+  if(!state.paletteContext || targetTab==='keymap' || state.currentTab!==targetTab) return;
+  const rect=slot.getBoundingClientRect();
+  const currentHeight=rect.height;
+  if(!currentHeight) return;
+  const desiredTop=Math.round(window.innerHeight*0.52);
+  const delta=rect.top-desiredTop;
+  if(delta<=8) return;
+  const nextHeight=Math.max(240,Math.min(Math.round(window.innerHeight*0.68),Math.round(currentHeight+delta)));
+  slot.style.setProperty('--palette-slot-size',`${nextHeight}px`);
+}
+function schedulePaletteSlotLayout(){
+  if(_paletteLayoutRaf) cancelAnimationFrame(_paletteLayoutRaf);
+  _paletteLayoutRaf=requestAnimationFrame(()=>{
+    _paletteLayoutRaf=0;
+    syncPaletteSlotLayout();
+  });
+}
+function mountPalette(){
+  const palette=document.getElementById('palette-panel');
+  if(!palette) return;
+  const targetTab=state.paletteContext?.tab || 'keymap';
+  const slot=document.getElementById(`pal-slot-${targetTab}`);
+  if(slot && palette.parentElement!==slot) slot.appendChild(palette);
+  document.querySelectorAll('.tab-palette-slot').forEach(el=>el.classList.remove('active'));
+  const shouldShow=state.currentTab==='keymap' || (!!state.paletteContext && targetTab===state.currentTab);
+  if(shouldShow && slot) slot.classList.add('active');
+}
+function refreshPaletteTargets(){
+  if(state.layers.length) renderKeyboard();
+  renderTpGestureKeys();
+  renderModTapTab();
+  renderComboTab();
+  if(state.currentTab==='macro') renderMacroStepEditor(state.macroSelectedSlot);
+  ['single_tap','single_hold','double_tap'].forEach(field=>{
+    const zone=document.getElementById(`td-${field.replace(/_/g,'-')}-zone`);
+    if(zone) zone.classList.toggle('pal-target', isPaletteTarget('td-modal',{field}));
+  });
+}
+function clearPaletteContext(){
+  state.paletteContext=null;
+  if(!PALETTE_CATS.some(cat=>cat.id===state.activePalCat)) state.activePalCat='basic';
+  renderPalette();
+  refreshPaletteTargets();
+}
+function activatePaletteContext(ctx){
+  state.paletteContext={
+    ...ctx,
+    tab:ctx.tab || state.currentTab || 'keymap',
+    cats:ctx.cats || getPaletteCatsByIds(ctx.catIds || DEFAULT_BINDING_CAT_IDS),
+  };
+  if(!state.paletteContext.cats.some(cat=>cat.id===state.activePalCat)){
+    state.activePalCat=ctx.initialCat || state.paletteContext.cats[0]?.id || 'basic';
+  } else if(ctx.initialCat){
+    state.activePalCat=ctx.initialCat;
+  }
+  renderPalette();
+  refreshPaletteTargets();
+}
+function isPaletteTarget(type, attrs={}){
+  const target=state.paletteContext?.target;
+  if(!target || target.type!==type) return false;
+  return Object.entries(attrs).every(([k,v])=>target[k]===v);
+}
+function validateTdDefsBeforeSave(){
+  for(let i=0;i<TD_COUNT;i++){
+    const td=getTd(i);
+    for(const field of ['single_tap','single_hold','double_tap']){
+      if(td[field] && !isTapDanceFieldComplete(field, td[field])){
+        setStatus(`TD${i} の ${tdFieldMeta(field).label} は完成した binding にしてください。&tdN は使えません。`,'s-warn');
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+// 笏笏 蜈ｨ菴謎ｿ晏ｭ・笏笏
+async function saveAll(){
+  if(!validateTdDefsBeforeSave()) return;
+  setStatus('Saving...');
+  try {
+    await api('/api/settings','POST',{td_definitions:state.tdDefs, macro_definitions:state.macroDefs});
+    let tdModuleStatus='not_needed';
+    if(state.layers.length){
+      const r=await api('/api/keymap','POST',{layers:state.layers, combos:state.combos, td_definitions:state.tdDefs, conditional_layers:state.conditionalLayers, macro_definitions:state.macroDefs});
+      if(r.error){ setStatus(r.error,'s-err'); return; }
+      tdModuleStatus=r.td_module||tdModuleStatus;
+    }
+    for(const side of ['left','right']){
+      if(Object.keys(state.tpConfigs[side]).length){
+        const r=await api(`/api/config/${side}`,'POST',{config:state.tpConfigs[side]});
+        if(r.error){ setStatus(`Trackpad (${side}) save error: `+r.error,'s-err'); return; }
+      }
+    }
+    if(Object.keys(state.mainConfig).length){
+      const r=await api('/api/config/main','POST',{config:state.mainConfig});
+      if(r.error){ setStatus('General config save error: '+r.error,'s-err'); return; }
+    }
+    await refreshSettingsMeta();
+    markSaved(); setStatus(saveSuccessMessage(tdModuleStatus),'s-ok');
+  } catch(e){ setStatus('Save error: '+e.message,'s-err'); }
+}
+
+// 笏笏 險ｭ螳壹Δ繝ｼ繝繝ｫ 笏笏
+async function browseFolder(){
+  const data=await api('/api/browse_folder','POST',{});
+  if(data.cancelled||!data.folder) return;
+  document.getElementById('cfg-folder').value=data.folder;
+  await applyFolder();
+}
+async function openSettings(){
+  const s=await api('/api/settings');
+  applySettingsMeta(s);
+  document.getElementById('cfg-folder').value=s.firmware_folder||'';
+  document.getElementById('found-files').classList.add('d-none');
+  document.getElementById('apply-btn').classList.add('d-none');
+  if(s.firmware_folder) await applyFolder(true);
+  // 過去フォルダ履歴を表示
+  const hist=document.getElementById('folder-history');
+  const perFolder=s.per_folder_macros||{};
+  const paths=Object.keys(perFolder).filter(p=>p&&p!==s.firmware_folder);
+  if(paths.length){
+    hist.innerHTML='';
+    const title=document.createElement('div'); title.className='folder-history-title'; title.textContent='過去に設定したフォルダ（クリックで切り替え / ×で削除）:';
+    hist.appendChild(title);
+    paths.forEach(p=>{
+      const macros=perFolder[p]||[];
+      const count=macros.filter(m=>m.steps&&m.steps.length).length;
+      const item=document.createElement('div'); item.className='folder-history-item';
+      item.title=p;
+      const pathSpan=document.createElement('span'); pathSpan.className='folder-history-path'; pathSpan.textContent=p;
+      const actions=document.createElement('div'); actions.className='folder-history-actions';
+      const countSpan=document.createElement('span'); countSpan.className='folder-history-count'; countSpan.textContent=`${count} macro${count!==1?'s':''}`;
+      const delBtn=document.createElement('button'); delBtn.className='folder-history-del'; delBtn.textContent='×'; delBtn.title='この履歴を削除';
+      delBtn.onclick=async (ev)=>{
+        ev.stopPropagation();
+        await deleteSavedFolderPath(p);
+      };
+      actions.appendChild(countSpan);
+      actions.appendChild(delBtn);
+      item.appendChild(pathSpan);
+      item.appendChild(actions);
+      item.onclick=()=>{ document.getElementById('cfg-folder').value=p; applyFolder(); };
+      hist.appendChild(item);
+    });
+    hist.classList.remove('d-none');
+  } else {
+    hist.classList.add('d-none');
+  }
+  document.getElementById('settings-ov').classList.add('open');
+}
+function closeSettings(){ document.getElementById('settings-ov').classList.remove('open'); }
+async function deleteSavedFolderPath(path){
+  const target=String(path||'').trim();
+  if(!target) return;
+  const confirmed=confirm(`保存済みフォルダ履歴から削除しますか？\n${target}`);
+  if(!confirmed) return;
+
+  const res=await api('/api/folder_history/delete','POST',{folder:target});
+  if(res.error){
+    setStatus('履歴削除エラー: '+res.error,'s-err');
+    return;
+  }
+  applySettingsMeta(res.settings||{});
+  setStatus('保存済みフォルダ履歴を削除しました。','s-ok');
+  if(document.getElementById('settings-ov').classList.contains('open')) await openSettings();
+}
+async function applyFolder(silent=false){
+  const folder=document.getElementById('cfg-folder').value.trim(); if(!folder) return;
+  const data=await api('/api/folder','POST',{folder});
+  const box=document.getElementById('found-files'); const btn=document.getElementById('apply-btn');
+  if(data.error){ box.innerHTML=`<div class="ff ng">Error: ${data.error}</div>`; box.classList.remove('d-none'); btn.classList.add('d-none'); return; }
+  const files=[{label:'Keymap',path:data.keymap_path},{label:'Main Config',path:data.main_conf_path},{label:'Left TP',path:data.left_conf_path},{label:'Right TP',path:data.right_conf_path}];
+  box.innerHTML=files.map(f=>`<div class="ff ok">OK ${f.label}: <span style="color:var(--dim)">${f.path||'-'}</span></div>`).join('');
+  box.classList.remove('d-none'); btn.classList.remove('d-none');
+  await refreshSettingsMeta();
+  if(!silent) setStatus('Folder check complete.','s-ok');
+}
+async function saveAndLoad(){
+  closeSettings();
+  await loadKeymap();
+  await refreshSettingsMeta();
+  ['left','right','main'].forEach(s=>loadConfig(s).catch(()=>{}));
+}
+
+// 笏笏 繧ｭ繝ｼ繝槭ャ繝・隱ｭ霎ｼ/險ｭ螳夊ｪｭ霎ｼ 笏笏
+async function loadKeymap(){
+  setStatus('Loading...');
+  const data=await api('/api/keymap');
+  if(data.error){ setStatus(data.error,'s-err'); document.getElementById('file-status').textContent=data.error; return; }
+  state.layers=data.layers; state.currentLayer=0;
+  state.combos=data.combos||[];
+  state.conditionalLayers=data.conditional_layers||[];
+  state.tdDefs=data.td_definitions||state.tdDefs;
+  if(data.macro_definitions) state.macroDefs=hydrateMacroDefs(data.macro_definitions);
+  injectCustomPalette(data.custom_bindings||[]);
+  markSaved();
+  document.getElementById('file-status').textContent=data.path;
+  document.getElementById('status-info').textContent=`${state.layers.length} layers / ${(state.layers[0]?.bindings||[]).length} keys`;
+  document.getElementById('no-data-box').classList.add('d-none');
+  document.getElementById('keyboard').classList.remove('d-none');
+  renderLayerBtns(); renderKeyboard(); renderPalette(); renderTpGestureKeys(); renderModTapTab(); renderComboTab(); renderConditionalTab(); renderMacroTab();
+  setStatus('Loaded','s-ok');
+}
+async function loadConfig(side){
+  const data=await api(`/api/config/${side}`); if(data.error){ setStatus(data.error,'s-err'); return; }
+  if(side==='main'){ state.mainConfig=data.config; if(document.getElementById('tab-general').classList.contains('active')) renderGeneralSettings(); }
+  else { state.tpConfigs[side]=data.config; if(side===state.tpSide&&document.getElementById('tab-trackpad').classList.contains('active')) renderTpSettings(); }
+}
+
+// 笏笏 繧ｭ繝ｼ繝懊・繝画緒逕ｻ 笏笏
+function renderLayerBtns(){
+  ['layer-bar','tp-layer-bar'].forEach(id=>{
+    const bar=document.getElementById(id);
+    if(!bar) return;
+    bar.innerHTML='<span style="color:var(--dim);font-size:11px">Layer:</span>';
+    state.layers.forEach((l,i)=>{
+      const b=document.createElement('button');
+      b.className='lbtn'+(i===state.currentLayer?' active':'');
+      b.dataset.layerIdx=String(i);
+      b.textContent=`${i}: ${l.display_name}`;
+      b.onclick=()=>switchLayer(i);
+      bar.appendChild(b);
+    });
+  });
+}
+function renderKeyboard(){
+  const kb=document.getElementById('keyboard'); kb.innerHTML='';
+  kb.style.width=`${1300*SCALE}px`; kb.style.height=`${720*SCALE}px`;
+  const binds=state.layers[state.currentLayer]?.bindings||[];
+  KL.forEach((pos,idx)=>{
+    const b=binds[idx]||{raw:'&none'};
+    const label=bindingLabel(b.raw),cls=bindingClass(b.raw);
+    const el=document.createElement('div');
+    el.className=`key ${cls}`; el.dataset.idx=idx;
+    const mcTip=b.raw.match(MACRO_RE);
+    const tdTip=b.raw.match(/^&td(\d+)$/);
+    const keyTitle=mcTip ? `${b.raw}${state.macroDefs[+mcTip[1]]?.display_name?' — '+state.macroDefs[+mcTip[1]].display_name:''}`
+      : tdTip ? `${b.raw}${state.tdDefs[+tdTip[1]]?.display_name?' — '+state.tdDefs[+tdTip[1]].display_name:''}`
+      : b.raw;
+    el.title=keyTitle;
+    bindHoverCode(el,keyTitle);
+    if(isPaletteTarget('key',{idx})) el.classList.add('pal-target');
+    el.style.left=`${pos.x*SCALE}px`; el.style.top=`${pos.y*SCALE}px`;
+    el.style.width=`${pos.w*SCALE-GAP}px`; el.style.height=`${pos.h*SCALE-GAP}px`;
+    if(pos.w<100) el.style.fontSize='8px';
+    const parts=label.split('\n');
+    const s1=document.createElement('span'); s1.className='key-lbl'; s1.textContent=parts[0]; el.appendChild(s1);
+    if(parts[1]){ const s2=document.createElement('span'); s2.className='key-sub'; s2.textContent=parts[1]; el.appendChild(s2); }
+    el.addEventListener('click',()=>openKeyEdit(idx));
+    el.draggable=true;
+    el.addEventListener('dragstart',e=>{ e.dataTransfer.setData('text/plain',b.raw); e.dataTransfer.setData('src-idx',String(idx)); e.dataTransfer.effectAllowed='move'; });
+    el.addEventListener('dragover',e=>{ e.preventDefault(); el.classList.add('drag-over'); });
+    el.addEventListener('dragleave',()=>el.classList.remove('drag-over'));
+    el.addEventListener('drop',e=>{
+      e.preventDefault(); el.classList.remove('drag-over');
+      const raw=e.dataTransfer.getData('text/plain');
+      const src=e.dataTransfer.getData('src-idx');
+      if(!raw) return;
+      if(isPaletteTarget('key',{idx})){
+        const template=(state.layers[state.currentLayer].bindings[idx]||{raw:'&none'}).raw;
+        const key=extractKeyName(raw);
+        if(key && template.includes(MOD_PH)){
+          setBinding(idx,template.replace(MOD_PH,key));
+          clearPaletteContext();
+          return;
+        }
+      }
+      if(src!==''&&src!==String(idx)){
+        const old=(state.layers[state.currentLayer].bindings[idx]||{raw:'&none'}).raw;
+        setBinding(Number(src),old);
+      }
+      setBindingWithFollowUp(idx,raw,el);
+      // 菫ｮ鬟ｾ繝励Ξ繝ｼ繧ｹ繝帙Ν繝繝ｼ縺ｯ縺吶＄縺ｫ繧ｭ繝ｼ繝斐ャ繧ｫ繝ｼ繧帝幕縺・    });
+    });
+    kb.appendChild(el);
+  });
+}
+function setBinding(idx,raw){
+  if(!state.layers[state.currentLayer]) return;
+  const b=state.layers[state.currentLayer].bindings;
+  while(b.length<=idx) b.push({raw:'&trans'});
+  b[idx]={raw:raw.trim()};
+  markUnsaved(); renderKeyboard(); renderTpGestureKeys();
+}
+
+// 菫ｮ鬟ｾ繧ｭ繝ｼ蜀・く繝ｼ繧偵ヴ繝・き繝ｼ縺ｧ驕ｸ縺ｰ縺帙ｋ
+function setBindingWithFollowUp(idx,raw,anchorEl=null,opts={}){
+  setBinding(idx,raw);
+  if(needsFollowUpPicker(raw)){
+    openModPicker(document.querySelector(`[data-idx="${idx}"]`),idx,raw,opts);
+  }
+}
+function selectKeyForPalette(idx, initialCat='basic'){
+  activatePaletteContext({
+    tab:'keymap',
+    title:'',
+    note:'',
+    catIds:DEFAULT_BINDING_CAT_IDS,
+    initialCat,
+    target:{type:'key',idx},
+    onPick:(raw)=>{
+      setBindingWithFollowUp(idx,raw,null,{preserveKeyTarget:true, initialCat:state.activePalCat});
+    },
+  });
+}
+function openModPicker(anchorEl,idx,template,opts={}){
+  openTemplateFollowUpPicker({
+    tab:'keymap',
+    title:'Choose the follow-up key',
+    note:'Choose the key to combine with the selected behavior from the palette below.',
+    target:{type:'key',idx},
+    template,
+    onComplete:(completed)=>{
+      setBinding(idx, completed);
+    },
+    onAfterComplete:()=>{
+      if(opts.preserveKeyTarget) selectKeyForPalette(idx, opts.initialCat || 'basic');
+      else clearPaletteContext();
+    },
+  });
+}
+
+// 笏笏 繧ｭ繝ｼ邱ｨ髮・Δ繝ｼ繝繝ｫ 笏笏
+function openKeyEdit(idx, titleOverride){
+  if(isPaletteTarget('key',{idx})){ clearPaletteContext(); return; }
+  selectKeyForPalette(idx,'basic');
+}
+function closeKeyEdit(){
+  if(state.paletteContext?.target?.type==='key'){ clearPaletteContext(); return; }
+  document.getElementById('key-edit-ov').classList.remove('open');
+}
+function applyKeyEdit(){
+  const raw=document.getElementById('edit-binding').value.trim();
+  if(raw&&state.editIdx>=0){
+    const anchor=document.querySelector(`[data-idx="${state.editIdx}"]`);
+    setBindingWithFollowUp(state.editIdx,raw,anchor);
+  }
+  closeKeyEdit();
+}
+
+// 笏笏 繝輔Ο繝ｼ繝・ぅ繝ｳ繧ｰ繧ｭ繝ｼ繝斐ャ繧ｫ繝ｼ 笏笏
+const PICKER_DEFS={
+  basic_only:[
+    ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(c=>({r:c,l:c})),
+    {r:'SPACE',l:'SPC'},{r:'ENTER',l:'ENT'},{r:'BACKSPACE',l:'BSP'},{r:'DELETE',l:'DEL'},
+    {r:'ESCAPE',l:'ESC'},{r:'TAB',l:'TAB'},{r:'CAPS',l:'CAP'},
+    ...Array.from({length:12},(_,i)=>({r:`F${i+1}`,l:`F${i+1}`})),
+    {r:'LEFT',l:'Left'},{r:'RIGHT',l:'Right'},{r:'UP',l:'Up'},{r:'DOWN',l:'Down'},
+    {r:'HOME',l:'HOM'},{r:'END',l:'END'},{r:'PAGE_UP',l:'PgU'},{r:'PAGE_DOWN',l:'PgD'},
+    {r:'NUMBER_0',l:'0'},{r:'NUMBER_1',l:'1'},{r:'NUMBER_2',l:'2'},{r:'NUMBER_3',l:'3'},{r:'NUMBER_4',l:'4'},
+    {r:'NUMBER_5',l:'5'},{r:'NUMBER_6',l:'6'},{r:'NUMBER_7',l:'7'},{r:'NUMBER_8',l:'8'},{r:'NUMBER_9',l:'9'},
+    {r:'MINUS',l:'-'},{r:'EQUAL',l:'='},{r:'GRAVE',l:'`'},{r:'SEMI',l:';'},{r:'SQT',l:"'"},{r:'COMMA',l:','},{r:'PERIOD',l:'.'},{r:'SLASH',l:'/'},
+  ],
+  modifier:[
+    {r:'LEFT_SHIFT',l:'LSft',m:true},{r:'RIGHT_SHIFT',l:'RSft',m:true},
+    {r:'LEFT_CONTROL',l:'LCtl',m:true},{r:'RIGHT_CONTROL',l:'RCtl',m:true},
+    {r:'LEFT_ALT',l:'LAlt',m:true},{r:'RIGHT_ALT',l:'RAlt',m:true},
+    {r:'LEFT_GUI',l:'LGui',m:true},{r:'RIGHT_GUI',l:'RGui',m:true},
+  ],
+};
+let _pickerCallback=null;
+let _pickerKeys=[];
+let _bindingPickerCallback=null;
+let _bindingPickerCats=[];
+let _bindingPickerCat='basic';
+
+function openKeyPickerAt(anchorEl, callback, filter='basic_only'){
+  _pickerCallback=callback;
+  const keys=filter==='modifier'?PICKER_DEFS.modifier:PICKER_DEFS.basic_only;
+  _pickerKeys=filter==='modifier'?keys:[...PICKER_DEFS.modifier,...keys];
+  _pickerKeys = filter==='basic_only'?keys:_pickerKeys; // basic_only縺ｯ蝓ｺ譛ｬ縺ｮ縺ｿ
+  if(filter==='modifier') _pickerKeys=PICKER_DEFS.modifier;
+  document.getElementById('kp-search').value='';
+  renderPickerGrid(_pickerKeys);
+  // 菴咲ｽｮ豎ｺ繧・  const picker=document.getElementById('key-picker');
+  picker.classList.remove('d-none');
+  document.getElementById('picker-backdrop').classList.remove('d-none');
+  if(anchorEl){
+    const rect=anchorEl.getBoundingClientRect();
+    let top=rect.bottom+6, left=rect.left;
+    if(top+340>window.innerHeight) top=rect.top-340;
+    if(left+330>window.innerWidth) left=window.innerWidth-335;
+    picker.style.top=Math.max(10,top)+'px';
+    picker.style.left=Math.max(10,left)+'px';
+  } else {
+    picker.style.top='50%'; picker.style.left='50%';
+    picker.style.transform='translate(-50%,-50%)';
+  }
+  setTimeout(()=>document.getElementById('kp-search').focus(),50);
+}
+function renderPickerGrid(keys){
+  const grid=document.getElementById('kp-grid'); grid.innerHTML='';
+  keys.forEach(k=>{
+    const el=document.createElement('div');
+    el.className='kp-key'+(k.m?' km':'');
+    el.textContent=k.l||k.r; el.title=k.r;
+    el.draggable=true;
+    el.addEventListener('dragstart',e=>{
+      const raw=k.m ? k.r : `&kp ${k.r}`;
+      e.dataTransfer.setData('text/plain',raw);
+      e.dataTransfer.setData('src-idx','');
+      e.dataTransfer.effectAllowed='copy';
+    });
+    el.onclick=()=>{ if(_pickerCallback) _pickerCallback(k.r); closeKeyPicker(); };
+    grid.appendChild(el);
+  });
+}
+function filterKeyPicker(){
+  const q=document.getElementById('kp-search').value.toLowerCase();
+  const filtered=_pickerKeys.filter(k=>(k.l||k.r).toLowerCase().includes(q)||k.r.toLowerCase().includes(q));
+  renderPickerGrid(filtered);
+}
+function closeKeyPicker(){
+  document.getElementById('key-picker').classList.add('d-none');
+  document.getElementById('picker-backdrop').classList.add('d-none');
+  _pickerCallback=null;
+}
+function getBindingPickerCats(catIds=DEFAULT_BINDING_CAT_IDS){
+  return catIds.map(id=>PALETTE_CATS.find(cat=>cat.id===id)).filter(Boolean);
+}
+function positionBindingPicker(anchorEl){
+  const picker=document.getElementById('binding-picker');
+  picker.style.transform='';
+  if(anchorEl){
+    const rect=anchorEl.getBoundingClientRect();
+    let top=rect.bottom+6, left=rect.left;
+    if(top+430>window.innerHeight) top=rect.top-430;
+    if(left+530>window.innerWidth) left=window.innerWidth-540;
+    picker.style.top=Math.max(10,top)+'px';
+    picker.style.left=Math.max(10,left)+'px';
+  } else {
+    picker.style.top='50%';
+    picker.style.left='50%';
+    picker.style.transform='translate(-50%,-50%)';
+  }
+}
+function openBindingPickerAt(anchorEl, callback, opts={}){
+  _bindingPickerCallback=callback;
+  _bindingPickerCats=getBindingPickerCats(opts.catIds||BINDING_PICKER_CAT_IDS);
+  _bindingPickerCat=opts.initialCat&&_bindingPickerCats.some(cat=>cat.id===opts.initialCat)
+    ? opts.initialCat
+    : (_bindingPickerCats[0]?.id||'basic');
+  document.getElementById('binding-picker-title').textContent=opts.title||'Choose binding';
+  renderBindingPicker();
+  document.getElementById('binding-picker').classList.remove('d-none');
+  document.getElementById('binding-picker-backdrop').classList.remove('d-none');
+  positionBindingPicker(anchorEl);
+}
+function closeBindingPicker(){
+  document.getElementById('binding-picker').classList.add('d-none');
+  document.getElementById('binding-picker-backdrop').classList.add('d-none');
+  _bindingPickerCallback=null;
+}
+// 笏笏 TD 險ｭ螳・笏笏
+let _mtEditIdx=-1;
+function tdFieldMeta(field){
+  return {
+    single_tap:{label:'Single Tap', note:'1回タップ時の binding を選びます。Quantum の modified key も使えます。'},
+    single_hold:{label:'Single Hold', note:'1回ホールド時の binding を選びます。レイヤー切り替えや BT 動作も設定できます。'},
+    double_tap:{label:'Double Tap', note:'2回タップ時の binding を選びます。'},
+  }[field]||{label:field,note:'binding を選びます。'};
+}
+function getTapDanceFieldCats(field){
+  const baseCats=getPaletteCatsByIds(DEFAULT_BINDING_CAT_IDS);
+  return baseCats.map(cat=>({...cat, disableFn:(item)=>!isTapDanceFieldSafe(field,item.r)}));
+}
+function applyTdFieldValue(index, field, raw, isModal=false){
+  if(!isTapDanceFieldSafe(field, raw)){
+    setStatus(tapDanceFieldWarn(field),'s-warn');
+    return false;
+  }
+  if(isModal){
+    document.getElementById(`td-${field.replace(/_/g,'-')}`).value=raw;
+    updateTdZoneDisplay(field,raw);
+    updateMtPreview();
+  } else {
+    state.tdDefs[index]={...getTd(index),[field]:raw};
+    markUnsaved();
+    renderModTapTab();
+    renderPalette();
+  }
+  return true;
+}
+function openBindingPickerForTdField(field){
+  activateTdFieldContext(_mtEditIdx,field,true);
+}
+function openMtEdit(i){
+  _mtEditIdx=i; const d=getTd(i);
+  document.getElementById('mt-title').textContent=`TD${i}`;
+  document.getElementById('td-single-tap').value=d.single_tap||'';
+  document.getElementById('td-single-hold').value=d.single_hold||'';
+  document.getElementById('td-double-tap').value=d.double_tap||'';
+  document.getElementById('mt-term').value=d.tapping_term||200;
+  ['single_tap','single_hold','double_tap'].forEach(field=>updateTdZoneDisplay(field,d[field]||''));
+  updateMtPreview();
+  document.getElementById('mt-edit-ov').classList.add('open');
+}
+function updateTdZoneDisplay(field,raw){
+  const zone=document.getElementById(`td-${field.replace(/_/g,'-')}-zone`);
+  const disp=document.getElementById(`td-${field.replace(/_/g,'-')}-disp`);
+  if(raw){ disp.textContent=`${bindingLabel(raw).replace('\n',' / ')} (${raw})`; disp.style.color='var(--text)'; zone.classList.add('has-value'); }
+  else { disp.textContent='Drag here or click to choose'; disp.style.color=''; zone.classList.remove('has-value'); }
+}
+function dropOnTdZone(field,event){
+  event.preventDefault(); document.getElementById(`td-${field.replace(/_/g,'-')}-zone`).classList.remove('drag-over');
+  const raw=event.dataTransfer.getData('text/plain'); if(!raw) return;
+  const normalized=normalizeTdBinding(raw);
+  if(needsFollowUpPicker(normalized)){
+    if(!applyTdFieldValue(_mtEditIdx,field,normalized,true)) return;
+    openTemplateFollowUpPicker({
+      tab:'modtap',
+      title:`TD${_mtEditIdx} の ${tdFieldMeta(field).label} に使うキーを選択`,
+      note:'Quantum のテンプレートに埋め込むキーを選びます。',
+      target:{type:'td-modal',field},
+      template:normalized,
+      onComplete:(completed)=>{
+        if(applyTdFieldValue(_mtEditIdx,field,completed,true) && isPaletteTarget('td-modal',{field})) clearPaletteContext();
+      },
+    });
+    return;
+  }
+  if(applyTdFieldValue(_mtEditIdx,field,normalized,true) && isPaletteTarget('td-modal',{field})) clearPaletteContext();
+}
+function extractKeyName(raw){
+  if(!raw) return '';
+  const trimmed=raw.trim();
+  if(!trimmed.startsWith('&')) return trimmed;
+  const s=raw.trim().replace(/^&/,'').split(/\s+/);
+  if(s[0]==='kp') return s[1]||'';
+  if(s[0]==='mt'||s[0]==='mt2') return s[1]||''; // hold key
+  // modifier逶ｴ謗･繝峨Ο繝・・
+  const modKeys=['LEFT_SHIFT','RIGHT_SHIFT','LEFT_CONTROL','RIGHT_CONTROL','LEFT_ALT','RIGHT_ALT','LEFT_GUI','RIGHT_GUI'];
+  if(modKeys.includes(s[0])) return s[0];
+  return '';
+}
+function extractModifierChoice(raw){
+  const key=extractKeyName(raw);
+  if(MOD_EXPR_LABELS[key]) return key;
+  if(/^(LEFT|RIGHT)_(SHIFT|CONTROL|ALT|GUI)$/.test(key)) return key;
+  if(/^[LR][SCAG]\(.+\)$/.test(key)) return key;
+  return '';
+}
+function activateTdFieldContext(index,field,isModal=false){
+  const meta=tdFieldMeta(field);
+  activatePaletteContext({
+    tab:'modtap',
+    title:`TD${index} の ${meta.label} を設定`,
+    note:meta.note,
+    cats:getTapDanceFieldCats(field),
+    initialCat:'basic',
+    target:{type:isModal?'td-modal':'td-cell',index,field},
+    onPick:(raw)=>{
+      const normalized=normalizeTdBinding(raw);
+      if(!normalized) return;
+      if(needsFollowUpPicker(normalized)){
+        if(!applyTdFieldValue(index,field,normalized,isModal)) return;
+        openTemplateFollowUpPicker({
+          tab:'modtap',
+          title:`TD${index} の ${meta.label} に使うキーを選択`,
+          note:'Quantum のテンプレートに埋め込むキーを選びます。',
+          target:{type:isModal?'td-modal':'td-cell',index,field},
+          template:normalized,
+          onComplete:(completed)=>{
+            if(applyTdFieldValue(index,field,completed,isModal)) clearPaletteContext();
+          },
+        });
+        return;
+      }
+      if(applyTdFieldValue(index,field,normalized,isModal)) clearPaletteContext();
+    },
+  });
+}
+function updateMtPreview(){
+  document.getElementById('mt-preview').textContent=tdPreviewRaw(_mtEditIdx);
+}
+['single_tap','single_hold','double_tap'].forEach(field=>{
+  document.getElementById(`td-${field.replace(/_/g,'-')}`).oninput=function(){
+    const normalized=normalizeTdBinding(this.value);
+    this.value=normalized;
+    updateTdZoneDisplay(field,normalized);
+    updateMtPreview();
+  };
+});
+function closeMtEdit(){
+  document.getElementById('mt-edit-ov').classList.remove('open');
+  if(['single_tap','single_hold','double_tap'].some(field=>isPaletteTarget('td-modal',{field}))) clearPaletteContext();
+}
+function applyMtEdit(){
+  const next={
+    single_tap:normalizeTdBinding(document.getElementById('td-single-tap').value),
+    single_hold:normalizeTdBinding(document.getElementById('td-single-hold').value),
+    double_tap:normalizeTdBinding(document.getElementById('td-double-tap').value),
+  };
+  for(const field of ['single_tap','single_hold','double_tap']){
+    if(next[field] && !isTapDanceFieldComplete(field, next[field])){
+      setStatus(`${tdFieldMeta(field).label} には完成した binding を設定してください。&tdN は使えません。`,'s-warn');
+      return;
+    }
+  }
+  const term=parseInt(document.getElementById('mt-term').value)||200;
+  state.tdDefs[_mtEditIdx]={...next,tapping_term:term};
+  markUnsaved(); closeMtEdit(); renderModTapTab(); renderPalette();
+}
+
+function renderTdKeyBox(index, field, raw){
+  const wrap=document.createElement('div'); wrap.className='td-state';
+  const label=document.createElement('div'); label.className='td-state-label'; label.textContent=tdFieldMeta(field).label;
+  const effectiveRaw=raw || '&none';
+  const box=document.createElement('div'); box.className=`td-state-key ${bindingClass(effectiveRaw)}`;
+  box.classList.toggle('pal-target',isPaletteTarget('td-cell',{index,field}));
+  box.classList.toggle('empty',!raw);
+  box.textContent=raw ? bindingLabel(raw) : '';
+  box.title=raw || '&none';
+  box.onclick=()=>activateTdFieldContext(index,field,false);
+  box.addEventListener('dragover',e=>{ e.preventDefault(); box.classList.add('pal-target'); });
+  box.addEventListener('dragleave',()=>box.classList.toggle('pal-target',isPaletteTarget('td-cell',{index,field})));
+  box.addEventListener('drop',e=>{
+    e.preventDefault();
+    const raw=normalizeTdBinding(e.dataTransfer.getData('text/plain'));
+    if(!raw) return;
+    if(needsFollowUpPicker(raw)){
+      if(!applyTdFieldValue(index,field,raw,false)) return;
+      openTemplateFollowUpPicker({
+        tab:'modtap',
+        title:`TD${index} の ${tdFieldMeta(field).label} に使うキーを選択`,
+        note:'Quantum のテンプレートに埋め込むキーを選びます。',
+        target:{type:'td-cell',index,field},
+        template:raw,
+        onComplete:(completed)=>{
+          if(applyTdFieldValue(index,field,completed,false) && isPaletteTarget('td-cell',{index,field})) clearPaletteContext();
+        },
+      });
+      return;
+    }
+    if(applyTdFieldValue(index,field,raw,false) && isPaletteTarget('td-cell',{index,field})) clearPaletteContext();
+  });
+  const code=document.createElement('div'); code.className='td-state-code'; code.textContent=raw || '&none';
+  wrap.appendChild(label); wrap.appendChild(box); wrap.appendChild(code);
+  return wrap;
+}
+function renderTdListPanel(){
+  const panel=document.getElementById('td-list-panel'); if(!panel) return;
+  panel.innerHTML='';
+  for(let i=0;i<TD_COUNT;i++){
+    const d=getTd(i);
+    const isEmpty=![d.single_tap,d.single_hold,d.double_tap].some(Boolean);
+    const li=document.createElement('div');
+    li.className='td-list-item'+(state.tdSelectedSlot===i?' active':'');
+    const lbl=document.createElement('span'); lbl.className='td-list-label'; lbl.textContent=`TD${i}`;
+    const summ=document.createElement('span'); summ.className='td-list-summary';
+    summ.textContent=isEmpty?'(未設定)':(d.display_name||[d.single_tap,d.single_hold,d.double_tap].filter(Boolean).join(' / '));
+    li.appendChild(lbl); li.appendChild(summ);
+    li.onclick=(()=>{const idx=i;return()=>{state.tdSelectedSlot=idx;renderModTapTab();};})();
+    panel.appendChild(li);
+  }
+}
+
+function renderTdDetailPanel(){
+  const panel=document.getElementById('td-detail-panel'); if(!panel) return;
+  panel.innerHTML='';
+  const i=state.tdSelectedSlot;
+  const d=getTd(i);
+  // header
+  const hdr=document.createElement('div'); hdr.className='td-card-hdr';
+  const name=document.createElement('div'); name.className='td-card-name'; name.textContent=`TD${i}`;
+  const raw=document.createElement('div'); raw.className='td-card-raw'; raw.textContent=tdPreviewRaw(i);
+  const btn=document.createElement('button'); btn.className='btn sm'; btn.textContent='Reset'; btn.onclick=()=>resetTd(i);
+  hdr.appendChild(name); hdr.appendChild(raw); hdr.appendChild(btn);
+  panel.appendChild(hdr);
+  // name input row (マクロスタイル)
+  const nameRow=document.createElement('div'); nameRow.className='macro-name-row';
+  const nameLbl=document.createElement('label'); nameLbl.style.cssText='font-size:11px;color:var(--dim);flex-shrink:0;white-space:nowrap;'; nameLbl.textContent='Name';
+  const nameInp=document.createElement('input'); nameInp.type='text';
+  nameInp.style.cssText='flex:1;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);padding:4px 7px;border-radius:3px;font-size:12px;';
+  nameInp.placeholder='Display name (shown on key)';
+  nameInp.value=d.display_name||'';
+  nameInp.oninput=()=>{ state.tdDefs[i]={...getTd(i),display_name:nameInp.value}; markUnsaved(); renderTdListPanel(); renderPalette(); };
+  nameRow.appendChild(nameLbl); nameRow.appendChild(nameInp);
+  // key grid
+  const grid=document.createElement('div'); grid.className='td-state-grid';
+  grid.appendChild(renderTdKeyBox(i,'single_tap',d.single_tap));
+  grid.appendChild(renderTdKeyBox(i,'single_hold',d.single_hold));
+  grid.appendChild(renderTdKeyBox(i,'double_tap',d.double_tap));
+  panel.appendChild(grid);
+  panel.insertBefore(nameRow, grid);
+  // footer: tapping term
+  const ft=document.createElement('div'); ft.className='td-card-ft';
+  const term=document.createElement('label'); term.className='td-term';
+  term.innerHTML='Tapping Term <input type="number" min="50" max="1000">';
+  const inp=term.querySelector('input');
+  inp.value=d.tapping_term||200;
+  inp.onchange=()=>{ state.tdDefs[i]={...getTd(i),tapping_term:parseInt(inp.value)||200}; markUnsaved(); };
+  ft.appendChild(term);
+  panel.appendChild(ft);
+}
+
+function renderModTapTab(){
+  renderTdListPanel();
+  renderTdDetailPanel();
+}
+function resetTd(index){
+  state.tdDefs[index]=tdEmpty();
+  markUnsaved();
+  if(_mtEditIdx===index) closeMtEdit();
+  const tdFields=['single_tap','single_hold','double_tap'];
+  const isActiveTdTarget=tdFields.some(field=>isPaletteTarget('td-cell',{index,field}));
+  if(isActiveTdTarget) clearPaletteContext();
+  renderModTapTab();
+  renderTdDetailPanel();
+  renderPalette();
+}
+function importMt2FromKeymap(){
+  if(!state.layers.length){ setStatus('Load the keymap first.','s-warn'); return; }
+  const seen=new Set(); const found=[];
+  state.layers.forEach(l=>(l.bindings||[]).forEach(b=>{ if(b.raw&&b.raw.trim().startsWith('&mt2 ')&&!seen.has(b.raw.trim())){ seen.add(b.raw.trim()); found.push(b.raw.trim()); } }));
+  if(!found.length){ setStatus('No &mt2 bindings were found in the keymap.','s-warn'); return; }
+  let slot=0;
+  found.forEach(raw=>{
+    if(slot>=TD_COUNT) return;
+    const parts=raw.replace(/^&mt2\s+/,'').trim().split(/\s+/);
+    if(parts.length>=2){
+      state.tdDefs[slot]={
+        single_tap:`&kp ${parts[1]}`,
+        single_hold:`&kp ${parts[0]}`,
+        double_tap:'',
+        tapping_term:200,
+      };
+      slot++;
+    }
+  });
+  markUnsaved(); renderModTapTab(); renderPalette();
+  setStatus(`Imported ${slot} legacy &mt2 bindings into TapDance slots.`,'s-ok');
+}
+
+function blankCombo(index){
+  return {name:`COMBO_${index+1}`, key_positions:'', binding:'&none', layers:'', timeout_ms:''};
+}
+function addCombo(){
+  state.combos.push(blankCombo(state.combos.length));
+  markUnsaved();
+  renderComboTab();
+}
+function removeCombo(index){
+  state.combos.splice(index,1);
+  markUnsaved();
+  if(isPaletteTarget('combo-binding',{index})) clearPaletteContext();
+  renderComboTab();
+}
+function setComboBinding(index, raw){
+  state.combos[index].binding = (raw || '&none').trim();
+  markUnsaved();
+  renderComboTab();
+}
+function setComboBindingWithFollowUp(index, raw){
+  setComboBinding(index, raw);
+  if(needsFollowUpPicker(raw)){
+    openTemplateFollowUpPicker({
+      tab:'combo',
+      title:`${state.combos[index].name || `Combo ${index+1}`} のキーを設定`,
+      note:'下のパレットから対象キーを選びます。',
+      target:{type:'combo-binding',index},
+      template:raw,
+      onComplete:(completed)=>{
+        setComboBinding(index, completed);
+      },
+    });
+  }
+}
+function renderComboTab(){
+  const list=document.getElementById('combo-list');
+  if(!list) return;
+  list.innerHTML='';
+  if(!state.combos.length){
+    list.innerHTML='<div style="color:var(--dim);text-align:center;padding:24px;font-size:12px">コンボが設定されていません。「コンボを追加」ボタンで追加できます。</div>';
+    return;
+  }
+  state.combos.forEach((combo,index)=>{
+    const card=document.createElement('div'); card.className='combo-card';
+
+    // ── ヘッダー: 名前 + 削除 ──
+    const hdr=document.createElement('div'); hdr.className='combo-card-hdr';
+    const nameInput=document.createElement('input');
+    nameInput.value=combo.name||''; nameInput.placeholder='COMBO_NAME';
+    nameInput.oninput=()=>{ combo.name=nameInput.value; markUnsaved(); };
+    const delBtn=document.createElement('button'); delBtn.className='btn sm'; delBtn.textContent='削除';
+    delBtn.onclick=()=>removeCombo(index);
+    hdr.appendChild(nameInput); hdr.appendChild(delBtn);
+    card.appendChild(hdr);
+
+    // ── キーポジション ──
+    const posField=document.createElement('div'); posField.className='combo-field';
+    const posLbl=document.createElement('div'); posLbl.className='combo-field-label'; posLbl.textContent='Keys';
+    const posWrap=document.createElement('div'); posWrap.className='combo-pos-wrap';
+    const positions=(combo.key_positions||'').split(/\s+/).filter(x=>x.trim());
+    if(positions.length===0){
+      const ph=document.createElement('span'); ph.style.cssText='color:var(--muted);font-size:11px;'; ph.textContent='未選択'; posWrap.appendChild(ph);
+    } else {
+      positions.forEach(p=>{
+        const chip=document.createElement('span'); chip.className='combo-pos-chip';
+        const idx=parseInt(p);
+        const lbl=!isNaN(idx)&&state.layers.length ? bindingLabel((state.layers[state.currentLayer]?.bindings[idx]||{raw:'&none'}).raw).split('\n')[0] : '';
+        chip.textContent=`#${p}${lbl?' '+lbl.substring(0,4):''}`;
+        chip.title=`Key index ${p}`;
+        posWrap.appendChild(chip);
+      });
+    }
+    const pickBtn=document.createElement('button'); pickBtn.className='combo-pick-btn';
+    pickBtn.textContent='⌨ キーボードから選択';
+    pickBtn.onclick=()=>openComboKbPicker(index);
+    posWrap.appendChild(pickBtn);
+    posField.appendChild(posLbl); posField.appendChild(posWrap);
+    card.appendChild(posField);
+
+    // ── バインディング ──
+    const bindField=document.createElement('div'); bindField.className='combo-field';
+    const bindLbl=document.createElement('div'); bindLbl.className='combo-field-label'; bindLbl.textContent='Binding';
+    const bindBtn=document.createElement('div');
+    bindBtn.className=`combo-binding-btn ${bindingClass(combo.binding)}`;
+    bindBtn.classList.toggle('pal-target',isPaletteTarget('combo-binding',{index}));
+    bindBtn.textContent=combo.binding ? bindingLabel(combo.binding) : '— クリックして設定 —';
+    bindBtn.title=combo.binding||'';
+    bindBtn.onclick=()=>activatePaletteContext({
+      tab:'combo',
+      title:`${combo.name||`Combo ${index+1}`} の割り当て`,
+      note:'下のパレットからキーをドラッグするか、クリックで割り当てます。',
+      catIds:DEFAULT_BINDING_CAT_IDS, initialCat:'basic',
+      target:{type:'combo-binding',index},
+      onPick:(raw)=>{ setComboBindingWithFollowUp(index,raw); if(!needsFollowUpPicker(raw)) clearPaletteContext(); },
+    });
+    bindBtn.addEventListener('dragover',e=>{ e.preventDefault(); bindBtn.classList.add('pal-target'); });
+    bindBtn.addEventListener('dragleave',()=>bindBtn.classList.toggle('pal-target',isPaletteTarget('combo-binding',{index})));
+    bindBtn.addEventListener('drop',e=>{
+      e.preventDefault(); const raw=e.dataTransfer.getData('text/plain'); if(!raw) return;
+      setComboBindingWithFollowUp(index,raw);
+      if(!needsFollowUpPicker(raw)&&isPaletteTarget('combo-binding',{index})) clearPaletteContext();
+    });
+    bindField.appendChild(bindLbl); bindField.appendChild(bindBtn);
+    card.appendChild(bindField);
+
+    // ── レイヤー ──
+    const layField=document.createElement('div'); layField.className='combo-field';
+    const layLbl=document.createElement('div'); layLbl.className='combo-field-label'; layLbl.textContent='Layers';
+    const layWrap=document.createElement('div'); layWrap.className='combo-layer-wrap';
+    const selLayers=new Set((combo.layers||'').split(/\s+/).filter(x=>x.trim()));
+    const allBtn=document.createElement('button'); allBtn.className='combo-layer-btn'+(selLayers.size===0?' active':'');
+    allBtn.textContent='All'; allBtn.title='全レイヤーで有効';
+    allBtn.onclick=()=>{ combo.layers=''; markUnsaved(); renderComboTab(); };
+    layWrap.appendChild(allBtn);
+    (state.layers.length?state.layers:[]).forEach((l,i)=>{
+      const b=document.createElement('button');
+      b.className='combo-layer-btn'+(selLayers.has(String(i))?' active':'');
+      b.textContent=`L${i}`;  b.title=`${i}: ${l.display_name}`;
+      b.onclick=()=>{
+        const s=new Set((combo.layers||'').split(/\s+/).filter(x=>x.trim()));
+        if(s.has(String(i))) s.delete(String(i)); else s.add(String(i));
+        combo.layers=[...s].sort((a,b)=>+a-+b).join(' ');
+        markUnsaved(); renderComboTab();
+      };
+      layWrap.appendChild(b);
+    });
+    layField.appendChild(layLbl); layField.appendChild(layWrap);
+    card.appendChild(layField);
+
+    // ── タイムアウト ──
+    const toField=document.createElement('div'); toField.className='combo-field';
+    const toLbl=document.createElement('div'); toLbl.className='combo-field-label'; toLbl.textContent='Timeout';
+    const toWrap=document.createElement('div'); toWrap.className='combo-timeout-wrap';
+    const toInput=document.createElement('input'); toInput.type='number';
+    toInput.value=combo.timeout_ms||''; toInput.placeholder='デフォルト';
+    toInput.oninput=()=>{ combo.timeout_ms=toInput.value.replace(/[^\d]/g,''); markUnsaved(); };
+    const toUnit=document.createElement('span'); toUnit.style.cssText='font-size:10px;color:var(--dim);'; toUnit.textContent='ms';
+    toWrap.appendChild(toInput); toWrap.appendChild(toUnit);
+    toField.appendChild(toLbl); toField.appendChild(toWrap);
+    card.appendChild(toField);
+
+    list.appendChild(card);
+  });
+}
+
+// ── コンボ用キーボードピッカー ──
+let _comboKbIdx=-1;
+let _comboKbSel=new Set();
+function openComboKbPicker(index){
+  _comboKbIdx=index;
+  const combo=state.combos[index];
+  _comboKbSel=new Set((combo?.key_positions||'').split(/\s+/).filter(x=>x.trim()));
+  document.getElementById('combo-kb-combo-name').textContent=combo?.name||`Combo ${index+1}`;
+  renderComboKb();
+  document.getElementById('combo-kb-ov').classList.add('open');
+}
+function renderComboKb(){
+  const scale=0.46, gap=2;
+  const KBW=1300, KBH=720;
+  const container=document.getElementById('combo-kb-container');
+  const kb=document.createElement('div');
+  kb.style.cssText=`position:relative;width:${KBW*scale}px;height:${KBH*scale}px;flex-shrink:0;`;
+  const binds=state.layers.length ? (state.layers[state.currentLayer]?.bindings||[]) : [];
+  KL.forEach((pos,idx)=>{
+    const el=document.createElement('div'); el.className='combo-kb-key';
+    el.classList.toggle('ck-selected',_comboKbSel.has(String(idx)));
+    el.style.left=`${pos.x*scale}px`; el.style.top=`${pos.y*scale}px`;
+    el.style.width=`${pos.w*scale-gap}px`; el.style.height=`${pos.h*scale-gap}px`;
+    if(pos.w<100) el.style.fontSize='7px';
+    const b=binds[idx]||{raw:'&trans'};
+    const lbl=bindingLabel(b.raw).split('\n')[0].substring(0,5);
+    el.textContent=lbl||String(idx);
+    const idxEl=document.createElement('span'); idxEl.className='ck-idx'; idxEl.textContent=`#${idx}`;
+    el.appendChild(idxEl);
+    el.onclick=()=>{
+      if(_comboKbSel.has(String(idx))) _comboKbSel.delete(String(idx)); else _comboKbSel.add(String(idx));
+      el.classList.toggle('ck-selected',_comboKbSel.has(String(idx)));
+      updateComboKbSelDisp();
+    };
+    kb.appendChild(el);
+  });
+  container.innerHTML=''; container.appendChild(kb);
+  updateComboKbSelDisp();
+}
+function updateComboKbSelDisp(){
+  const sel=[..._comboKbSel].sort((a,b)=>+a-+b);
+  document.getElementById('combo-kb-sel-disp').textContent=sel.length?sel.join(' '):'(なし)';
+}
+function closeComboKbPicker(){ document.getElementById('combo-kb-ov').classList.remove('open'); }
+function applyComboKbPicker(){
+  if(_comboKbIdx<0) return;
+  state.combos[_comboKbIdx].key_positions=[..._comboKbSel].sort((a,b)=>+a-+b).join(' ');
+  markUnsaved(); closeComboKbPicker(); renderComboTab();
+}
+
+// 笏笏 繝代Ξ繝・ヨ 笏笏
+function injectCustomPalette(customBindings){
+  const idx=PALETTE_CATS.findIndex(c=>c.id==='custom'); if(idx!==-1) PALETTE_CATS.splice(idx,1);
+  if(!customBindings.length) return;
+  PALETTE_CATS.push({
+    id:'custom',
+    label:'カスタム',
+    wrap:true,
+    keys:customBindings.map(raw=>{
+      const p=raw.replace(/^&/,'').split(/\s+/);
+      if(p[0]==='mt2'){
+        return {r:raw,l:bindingLabel(raw),cls:'k-mt',title:raw};
+      }
+      return {
+        r:raw,
+        l:p.length>1?p[0]+'\n'+kl(p[1]):p[0],
+        cls:bindingClass(raw)||'k-custom',
+        title:raw,
+      };
+    })
+  });
+}
+function enhancePaletteTabs(tabs){
+  if(!tabs || tabs.dataset.wheelBound==='1') return;
+  tabs.dataset.wheelBound='1';
+  tabs.addEventListener('wheel',e=>{
+    const delta=Math.abs(e.deltaX)>Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+    if(!delta) return;
+    tabs.scrollLeft += delta;
+    e.preventDefault();
+  }, {passive:false});
+}
+function shouldShowPaletteContextChrome(){
+  const targetType=state.paletteContext?.target?.type;
+  return !!state.paletteContext && targetType!=='key';
+}
+function renderPalette(){
+  mountPalette();
+  const palette=document.getElementById('palette-panel');
+  const head=document.getElementById('pal-head');
+  const cats=getActivePaletteCats();
+  const showContextChrome=shouldShowPaletteContextChrome();
+  palette.classList.toggle('contextual',showContextChrome);
+  head.classList.toggle('d-none',!showContextChrome);
+  if(showContextChrome){
+    document.getElementById('pal-title').textContent=state.paletteContext.title||'補助パレット';
+    document.getElementById('pal-note').textContent=state.paletteContext.note||'下のキーをドラッグして設定します。';
+  }
+  const tabs=document.getElementById('pal-tabs'); tabs.innerHTML=''; enhancePaletteTabs(tabs);
+  cats.forEach(cat=>{ const t=document.createElement('div'); t.className='pal-tab'+(cat.id===state.activePalCat?' active':''); t.textContent=cat.label; t.onclick=()=>{ state.activePalCat=cat.id; renderPalette(); }; tabs.appendChild(t); });
+  const activeTab=tabs.querySelector('.pal-tab.active');
+  if(activeTab) activeTab.scrollIntoView({block:'nearest', inline:'nearest'});
+  const body=document.getElementById('pal-body'); body.innerHTML='';
+  const cat=cats.find(c=>c.id===state.activePalCat) || cats[0]; if(!cat) return;
+  state.activePalCat=cat.id;
+  renderPaletteCategory(body,cat);
+  body.classList.toggle('pal-body-qwerty', cat.type==='qwerty');
+  schedulePaletteSlotLayout();
+}
+function renderPaletteCategory(target,cat,onSelect=null,wrapLists=false){
+  const isDisabled=(item)=>!!(cat.disableFn && item && item.gap===undefined && cat.disableFn(item));
+  if(cat.type==='qwerty'){
+    const wrap=document.createElement('div'); wrap.className='pal-qwerty';
+    const indent=['r0','r0','r1','r2','r3','r5','r6'];
+    QWERTY_ROWS.forEach((row,ri)=>{
+      const rowEl=document.createElement('div');
+      rowEl.className=`pal-row ${indent[ri]||'r0'}`;
+      row.forEach(k=>{
+        if(k.gap!==undefined){
+          const spacer=document.createElement('div');
+          spacer.className='pal-gap';
+          if(typeof k.gap==='number') spacer.style.width=k.gap+'px';
+          else spacer.classList.add(k.gap);
+          rowEl.appendChild(spacer);
+          return;
+        }
+        rowEl.appendChild(makePalKey(k.r,k.l,k.w||'',`${bindingClass(k.r)} ${(k.disabled||isDisabled(k))?'k-disabled':''}`.trim(),onSelect,k.title||'',!!(k.disabled||isDisabled(k))));
+      });
+      wrap.appendChild(rowEl);
+    });
+    target.appendChild(wrap);
+    return;
+  }
+  if(cat.type==='layer_dynamic'){
+    const wrap=document.createElement('div'); wrap.className='pal-layer';
+    getLayerPaletteRows().forEach(row=>{
+      const rowEl=document.createElement('div'); rowEl.className='pal-layer-row';
+      row.forEach(k=>rowEl.appendChild(makePalKey(k.r,k.l,k.w||'',`${bindingClass(k.r)} ${(k.disabled||isDisabled(k))?'k-disabled':''}`.trim(),onSelect,k.title||'',!!(k.disabled||isDisabled(k)))));
+      wrap.appendChild(rowEl);
+    });
+    target.appendChild(wrap);
+    return;
+  }
+  if(cat.type==='quantum_grouped'){
+    const wrap=document.createElement('div'); wrap.className='pal-quantum';
+    (cat.groups||[]).forEach(grp=>{
+      const row=document.createElement('div'); row.className='qgrp';
+      const lbl=document.createElement('span'); lbl.className='qgrp-label'; lbl.textContent=grp.label; row.appendChild(lbl);
+      const keys=document.createElement('div'); keys.className='qgrp-keys';
+      (grp.keys||[]).forEach(k=>keys.appendChild(makePalKey(k.r,k.l,k.w||'',`${k.r.includes(MOD_PH)?'k-mod':bindingClass(k.r)} ${(k.disabled||isDisabled(k))?'k-disabled':''}`.trim(),onSelect,k.title||'',!!(k.disabled||isDisabled(k)))));
+      row.appendChild(keys); wrap.appendChild(row);
+    });
+    target.appendChild(wrap);
+    return;
+  }
+  const wrap=document.createElement('div'); wrap.className='pal-wrap';
+  if(cat.type==='td'){
+    let tdAny=false;
+    for(let i=0;i<TD_COUNT;i++){
+      const d=getTd(i);
+      const isEmpty=![d.single_tap,d.single_hold,d.double_tap].some(Boolean);
+      const raw=tdPreviewRaw(i);
+      const name=d.display_name||'';
+      const disabled=isDisabled({r:raw})||isEmpty;
+      const tip=`TD${i}${name?' — '+name:''}\n${isEmpty?'(未設定)':[d.single_tap,d.single_hold,d.double_tap].filter(Boolean).join(' / ')}`;
+      const el=makePalKey(raw,`TD${i}`,'',`k-mt ${disabled?'k-disabled':''}`.trim(),onSelect,tip,disabled);
+      wrap.appendChild(el);
+      if(!isEmpty) tdAny=true;
+    }
+    if(!tdAny){
+      const hint=document.createElement('span');
+      hint.style.cssText='font-size:11px;color:var(--dim);padding:8px;';
+      hint.textContent='TapDanceタブでキーを設定してください';
+      wrap.appendChild(hint);
+    }
+  } else if(cat.type==='macro'){
+    let hasAny=false;
+    for(let i=0;i<MACRO_COUNT;i++){
+      const macro=state.macroDefs[i]||macroEmpty(i);
+      const hasSteps=(macro.steps?.length||0)>0;
+      const raw=`&mc${i}`;
+      const name=macro.display_name||'';
+      const disabled=isDisabled({r:raw})||!hasSteps;
+      const el=makePalKey(raw,`mc${i}`,'',`k-macro ${disabled?'k-disabled':''}`.trim(),onSelect,`mc${i}${name?' — '+name:''}`,disabled);
+      wrap.appendChild(el);
+      if(hasSteps) hasAny=true;
+    }
+    if(!hasAny){
+      const hint=document.createElement('span');
+      hint.style.cssText='font-size:11px;color:var(--dim);padding:8px;';
+      hint.textContent='Macroタブでマクロを設定してください';
+      wrap.appendChild(hint);
+    }
+  } else {
+    (cat.keys||[]).forEach(k=>{
+      const baseCls=k.cls || (cat.id==='custom' ? (bindingClass(k.r)||'k-custom') : bindingClass(k.r));
+      wrap.appendChild(makePalKey(k.r,k.l,'',`${baseCls} ${(k.disabled||isDisabled(k))?'k-disabled':''}`.trim(),onSelect,k.title||'',!!(k.disabled||isDisabled(k))));
+    });
+  }
+  target.appendChild(wrap);
+}
+function renderBindingPicker(){
+  const tabs=document.getElementById('binding-picker-tabs');
+  const body=document.getElementById('binding-picker-body');
+  tabs.innerHTML='';
+  body.innerHTML='';
+  _bindingPickerCats.forEach(cat=>{
+    const tab=document.createElement('div');
+    tab.className='picker-tab'+(cat.id===_bindingPickerCat?' active':'');
+    tab.textContent=cat.label;
+    tab.onclick=()=>{ _bindingPickerCat=cat.id; renderBindingPicker(); };
+    tabs.appendChild(tab);
+  });
+  const cat=_bindingPickerCats.find(item=>item.id===_bindingPickerCat);
+  if(cat) renderPaletteCategory(body,cat,(raw)=>{ if(_bindingPickerCallback) _bindingPickerCallback(raw); closeBindingPicker(); },true);
+}
+function makePalKey(raw,label,widthCls,extraCls='',onSelect=null,title='',disabled=false){
+  const el=document.createElement('div');
+  el.className=`pk ${widthCls} ${extraCls}`.trim();
+  el.textContent=label; el.title=title||raw;
+  bindHoverCode(el, raw);
+  if(!disabled && raw){
+    el.draggable=true;
+    el.addEventListener('dragstart',e=>{ e.dataTransfer.setData('text/plain',raw); e.dataTransfer.setData('src-idx',''); e.dataTransfer.effectAllowed='copy'; });
+    if(onSelect) el.onclick=()=>onSelect(raw);
+    else if(state.paletteContext?.onPick) el.onclick=()=>state.paletteContext.onPick(raw);
+  }
+  return el;
+}
+
+// 笏笏 繝医Λ繝・け繝代ャ繝芽ｨｭ螳・笏笏
+function renderTpGestureKeys(){
+  const container=document.getElementById('tp-gesture-keys'); if(!container) return; container.innerHTML='';
+  const copyBtn=document.getElementById('tp-gesture-copy-btn');
+  if(copyBtn){
+    const other=state.tpSide==='left' ? 'right' : 'left';
+    copyBtn.textContent=`Copy to ${other}`;
+  }
+  const indices=TP_CLUSTER[state.tpSide];
+  if(!state.layers.length){ container.innerHTML='<span style="color:var(--dim);font-size:11px">Trackpad assignments will appear after the keymap is loaded.</span>'; return; }
+  const binds=state.layers[state.currentLayer]?.bindings||[];
+  indices.forEach((keyIdx,i)=>{
+    const b=binds[keyIdx]||{raw:'&trans'};
+    const meta=TP_GESTURES[i]||{slot:`TP${i+1}`,label:`Gesture ${i+1}`};
+    const item=document.createElement('div'); item.className='gest-item';
+    item.classList.toggle('pal-target',isPaletteTarget('gesture',{idx:keyIdx}));
+    const lbl=document.createElement('span'); lbl.className='gest-label'; lbl.textContent=TP_GESTURE_LABELS[i]||`繧ｸ繧ｧ繧ｹ繝√Ε繝ｼ ${i+1}`;
+    lbl.textContent=`${meta.slot}: ${meta.label}`;
+    const keyEl=document.createElement('div'); keyEl.className=`gest-key ${bindingClass(b.raw)}`; keyEl.textContent=bindingLabel(b.raw); keyEl.title=b.raw;
+    item.appendChild(lbl); item.appendChild(keyEl);
+    const applyGestureBinding=(raw)=>{
+      setBinding(keyIdx,raw);
+      if(needsFollowUpPicker(raw)){
+        openTemplateFollowUpPicker({
+          tab:'trackpad',
+          title:`${meta.slot} に使うキーを選択`,
+          note:'Quantum のテンプレートに埋め込むキーを選びます。',
+          target:{type:'gesture',idx:keyIdx},
+          template:raw,
+          onComplete:(completed)=>{ setBinding(keyIdx,completed); clearPaletteContext(); },
+        });
+      } else {
+        clearPaletteContext();
+      }
+    };
+    item.onclick=()=>{
+      if(isPaletteTarget('gesture',{idx:keyIdx})){ clearPaletteContext(); return; }
+      activatePaletteContext({
+        tab:'trackpad',
+        title:`${meta.slot} の割り当て`,
+        note:'下のパレットからキーをドラッグするか、クリックで割り当てます。',
+        catIds:DEFAULT_BINDING_CAT_IDS,
+        initialCat:'basic',
+        target:{type:'gesture',idx:keyIdx},
+        onPick:applyGestureBinding,
+      });
+    };
+    item.addEventListener('dragover',e=>{ e.preventDefault(); item.classList.add('pal-target'); });
+    item.addEventListener('dragleave',()=>item.classList.toggle('pal-target',isPaletteTarget('gesture',{idx:keyIdx})));
+    item.addEventListener('drop',e=>{
+      e.preventDefault();
+      const raw=e.dataTransfer.getData('text/plain');
+      if(!raw) return;
+      applyGestureBinding(raw);
+    });
+    container.appendChild(item);
+  });
+}
+function copyCurrentTpGestureBindings(){
+  const other=state.tpSide==='left' ? 'right' : 'left';
+  copyTpGestureBindings(state.tpSide, other);
+}
+function copyTpGestureBindings(fromSide,toSide){
+  if(!state.layers.length || !state.layers[state.currentLayer]){
+    setStatus('キーマップ読込後にトラックパッド割り当てをコピーできます。','s-warn');
+    return;
+  }
+  const fromIdxs=TP_CLUSTER[fromSide];
+  const toIdxs=TP_CLUSTER[toSide];
+  const binds=state.layers[state.currentLayer].bindings || (state.layers[state.currentLayer].bindings=[]);
+  const copiedRaw=fromIdxs.map(idx=>(binds[idx]&&binds[idx].raw) ? binds[idx].raw : '&trans');
+  const maxIdx=Math.max(...toIdxs);
+  while(binds.length<=maxIdx) binds.push({raw:'&trans'});
+  toIdxs.forEach((idx,i)=>{ binds[idx]={raw:copiedRaw[i]}; });
+  markUnsaved();
+  renderKeyboard();
+  renderTpGestureKeys();
+  const sideName={left:'左',right:'右'};
+  setStatus(`Layer ${state.currentLayer} のトラックパッド割り当てを ${sideName[fromSide]} から ${sideName[toSide]} へコピーしました。`,'s-ok');
+}
+function getRotation(cfg){ if(cfg['CONFIG_INPUT_IQS9151_ROTATE_90']==='y') return 90; if(cfg['CONFIG_INPUT_IQS9151_ROTATE_180']==='y') return 180; if(cfg['CONFIG_INPUT_IQS9151_ROTATE_270']==='y') return 270; return 0; }
+function setRotation(cfg,deg,schema,cid){ ['0','90','180','270'].forEach(d=>cfg[`CONFIG_INPUT_IQS9151_ROTATE_${d}`]=(+d===deg?'y':'n')); markUnsaved(); renderSettingsGrid(schema,cfg,cid); }
+function copyTpSection(sect){
+  const other=state.tpSide==='left'?'right':'left';
+  const src=state.tpConfigs[state.tpSide],dst=state.tpConfigs[other];
+  sect.rows.forEach(row=>{ if(row.type==='rotate'){ ['0','90','180','270'].forEach(d=>{ const k=`CONFIG_INPUT_IQS9151_ROTATE_${d}`; if(k in src) dst[k]=src[k]; }); } else if(row.key&&row.key in src) dst[row.key]=src[row.key]; });
+  markUnsaved();
+  setStatus(`Copied "${sect.title}" to ${other}`,'s-ok');
+}
+function renderSettingsGrid(schema,cfgObj,cid){
+  const container=document.getElementById(cid); container.innerHTML='';
+  const isTP=cid==='tp-settings';
+  schema.forEach(sect=>{
+    const div=document.createElement('div'); div.className='sect';
+    const hdr=document.createElement('div'); hdr.className='sect-hdr';
+    const h3=document.createElement('h3'); h3.textContent=sect.title; hdr.appendChild(h3);
+    if(isTP){ const other=state.tpSide==='left'?'right':'left'; const cb=document.createElement('button'); cb.className='btn sm'; cb.textContent=`Copy to ${other}`; cb.onclick=()=>copyTpSection(sect); hdr.appendChild(cb); }
+    div.appendChild(hdr);
+    sect.rows.forEach(row=>{
+      const r=document.createElement('div'); r.className='srow';
+      const lbl=document.createElement('span'); lbl.className='slabel'; lbl.textContent=row.label; if(row.desc){lbl.classList.add('has-tip');lbl.title=row.desc;} r.appendChild(lbl);
+      if(row.type==='bool'){ const lw=document.createElement('label'); lw.className='toggle'; const inp=document.createElement('input'); inp.type='checkbox'; inp.checked=cfgObj[row.key]==='y'; inp.onchange=()=>{ cfgObj[row.key]=inp.checked?'y':'n'; markUnsaved(); }; const sl=document.createElement('span'); sl.className='tsl'; lw.appendChild(inp); lw.appendChild(sl); r.appendChild(lw); }
+      else if(row.type==='num'){ const inp=document.createElement('input'); inp.type='number'; inp.className='snum'; inp.value=cfgObj[row.key]||''; if(row.min!==undefined) inp.min=row.min; if(row.max!==undefined) inp.max=row.max; inp.oninput=()=>{ cfgObj[row.key]=inp.value; markUnsaved(); }; r.appendChild(inp); }
+      else if(row.type==='rotate'){ const grp=document.createElement('div'); grp.className='rot-grp'; const cur=getRotation(cfgObj); [0,90,180,270].forEach(deg=>{ const b=document.createElement('button'); b.className='rot-btn'+(cur===deg?' active':''); b.textContent=deg+'°'; b.onclick=()=>setRotation(cfgObj,deg,schema,cid); grp.appendChild(b); }); r.appendChild(grp); }
+      div.appendChild(r);
+    });
+    container.appendChild(div);
+  });
+}
+function renderTpSettings(){ renderTpGestureKeys(); renderSettingsGrid(TP_SCHEMA,state.tpConfigs[state.tpSide],'tp-settings'); }
+function renderGeneralSettings(){ renderSettingsGrid(MAIN_SCHEMA,state.mainConfig,'general-settings'); }
+function makeConditionalName(ifLayers, thenLayer, fallbackIndex){
+  const src=(ifLayers||[]).join('_') || `rule_${fallbackIndex+1}`;
+  const dst=String(thenLayer||'x');
+  return `cond_${src}_to_${dst}`;
+}
+function addConditionalLayer(){
+  const nextIndex=state.conditionalLayers.length;
+  state.conditionalLayers.push({
+    name:makeConditionalName([1, 2], 3, nextIndex),
+    if_layers:'1 2',
+    then_layer:'3',
+  });
+  markUnsaved();
+  renderConditionalTab();
+}
+function renderConditionalTab(){
+  const list=document.getElementById('conditional-list');
+  if(!list) return;
+  list.innerHTML='';
+  const layerCount=Math.max(state.layers.length, 5);
+  if(!state.conditionalLayers.length){
+    const empty=document.createElement('div');
+    empty.className='sect';
+    empty.innerHTML='<div style="font-size:12px;color:var(--dim);line-height:1.7">条件付きレイヤーは未設定です。<br>`if-layers` がすべて有効になったときに `then-layer` を追加で有効化します。</div>';
+    list.appendChild(empty);
+    return;
+  }
+  state.conditionalLayers.forEach((rule,index)=>{
+    const card=document.createElement('div'); card.className='combo-card';
+    const hdr=document.createElement('div'); hdr.className='combo-card-hdr';
+    const nameInput=document.createElement('input');
+    nameInput.value=rule.name||'';
+    nameInput.placeholder=`cond_rule_${index+1}`;
+    nameInput.oninput=()=>{ rule.name=nameInput.value.replace(/[^\w]/g,'_'); markUnsaved(); };
+    const removeBtn=document.createElement('button');
+    removeBtn.className='btn sm';
+    removeBtn.textContent='Remove';
+    removeBtn.onclick=()=>{ state.conditionalLayers.splice(index,1); markUnsaved(); renderConditionalTab(); };
+    hdr.appendChild(nameInput); hdr.appendChild(removeBtn);
+    card.appendChild(hdr);
+
+    const ifField=document.createElement('div'); ifField.className='combo-field';
+    const ifLbl=document.createElement('div'); ifLbl.className='combo-field-label'; ifLbl.textContent='If Layers';
+    const ifWrap=document.createElement('div'); ifWrap.className='combo-layer-wrap';
+    const selectedIf=new Set(String(rule.if_layers||'').split(/\s+/).filter(Boolean));
+    for(let i=0;i<layerCount;i++){
+      const btn=document.createElement('button');
+      btn.className='combo-layer-btn'+(selectedIf.has(String(i))?' active':'');
+      btn.textContent=`L${i}`;
+      btn.title=state.layers[i] ? `${i}: ${state.layers[i].display_name}` : `Layer ${i}`;
+      btn.onclick=()=>{
+        if(selectedIf.has(String(i))) selectedIf.delete(String(i)); else selectedIf.add(String(i));
+        const nextIf=[...selectedIf].sort((a,b)=>+a-+b);
+        rule.if_layers=nextIf.join(' ');
+        if(!rule.name || rule.name.startsWith('cond_')) rule.name=makeConditionalName(nextIf, rule.then_layer, index);
+        markUnsaved();
+        renderConditionalTab();
+      };
+      ifWrap.appendChild(btn);
+    }
+    ifField.appendChild(ifLbl); ifField.appendChild(ifWrap);
+    card.appendChild(ifField);
+
+    const thenField=document.createElement('div'); thenField.className='combo-field';
+    const thenLbl=document.createElement('div'); thenLbl.className='combo-field-label'; thenLbl.textContent='Then Layer';
+    const thenWrap=document.createElement('div'); thenWrap.className='combo-layer-wrap';
+    for(let i=0;i<layerCount;i++){
+      const btn=document.createElement('button');
+      btn.className='combo-layer-btn'+(String(rule.then_layer||'')===String(i)?' active':'');
+      btn.textContent=`L${i}`;
+      btn.title=state.layers[i] ? `${i}: ${state.layers[i].display_name}` : `Layer ${i}`;
+      btn.onclick=()=>{
+        rule.then_layer=String(i);
+        const nextIf=String(rule.if_layers||'').split(/\s+/).filter(Boolean).sort((a,b)=>+a-+b);
+        if(!rule.name || rule.name.startsWith('cond_')) rule.name=makeConditionalName(nextIf, i, index);
+        markUnsaved();
+        renderConditionalTab();
+      };
+      thenWrap.appendChild(btn);
+    }
+    thenField.appendChild(thenLbl); thenField.appendChild(thenWrap);
+    card.appendChild(thenField);
+
+    const note=document.createElement('div');
+    note.style.cssText='font-size:11px;color:var(--dim);line-height:1.6;';
+    note.textContent='If Layers で選んだレイヤーがすべて有効になったとき、Then Layer が追加で有効になります。';
+    card.appendChild(note);
+    list.appendChild(card);
+  });
+}
+
+// 笏笏 繧ｿ繝・/ 繝ｬ繧､繝､繝ｼ蛻・ｊ譖ｿ縺・笏笏
+function switchTab(name){
+  if(state.paletteContext?.tab && state.paletteContext.tab!==name) clearPaletteContext();
+  state.currentTab=name;
+  document.querySelectorAll('.main-tab').forEach((t,i)=>t.classList.toggle('active',TAB_NAMES[i]===name));
+  document.querySelectorAll('.tab-pane').forEach(t=>t.classList.remove('active'));
+  document.getElementById(`tab-${name}`).classList.add('active');
+  renderPalette();
+  if(name==='trackpad'){ renderTpGestureKeys(); if(Object.keys(state.tpConfigs[state.tpSide]).length) renderTpSettings(); }
+  if(name==='general'&&Object.keys(state.mainConfig).length) renderGeneralSettings();
+  if(name==='conditional') renderConditionalTab();
+  if(name==='modtap') renderModTapTab();
+  if(name==='combo') renderComboTab();
+  if(name==='macro') renderMacroTab();
+}
+function switchLayer(n){
+  state.currentLayer=n;
+  document.querySelectorAll('.lbtn[data-layer-idx]').forEach(b=>b.classList.toggle('active',+b.dataset.layerIdx===n));
+  if(state.layers.length){ renderKeyboard(); renderTpGestureKeys(); }
+}
+function switchTpSide(side){
+  state.tpSide=side;
+  document.querySelectorAll('.tp-btn').forEach((b,i)=>b.classList.toggle('active',['left','right'][i]===side));
+  renderTpGestureKeys();
+  if(Object.keys(state.tpConfigs[side]).length) renderTpSettings();
+  else loadConfig(side);
+}
+
+// 笏笏 繧ｭ繝ｼ繝懊・繝峨す繝ｧ繝ｼ繝医き繝・ヨ 笏笏
+
+// ===== MACRO TAB =====
+const US_CHAR_MAP = {
+  ' ': 'SPACE', '\t': 'TAB', '\n': 'ENTER', '\r': 'ENTER',
+  '0':'N0','1':'N1','2':'N2','3':'N3','4':'N4',
+  '5':'N5','6':'N6','7':'N7','8':'N8','9':'N9',
+  '-':'MINUS','=':'EQUAL','[':'LEFT_BRACKET',']':'RIGHT_BRACKET',
+  '\\':'BACKSLASH',';':'SEMI',"'":'SQT',',':'COMMA','.':'PERIOD','/':'SLASH','`':'GRAVE',
+  '!':'LS(N1)','@':'LS(N2)','#':'LS(N3)','$':'LS(N4)','%':'LS(N5)',
+  '^':'LS(N6)','&':'LS(N7)','*':'LS(N8)','(':'LS(N9)',')':'LS(N0)',
+  '_':'LS(MINUS)','+':'LS(EQUAL)','{':'LS(LEFT_BRACKET)','}':'LS(RIGHT_BRACKET)',
+  '|':'LS(BACKSLASH)',':':'LS(SEMI)','"':'LS(SQT)','<':'LS(COMMA)','>':'LS(PERIOD)',
+  '?':'LS(SLASH)','~':'LS(GRAVE)',
+  ...Object.fromEntries('abcdefghijklmnopqrstuvwxyz'.split('').map(c=>[c,c.toUpperCase()])),
+  ...Object.fromEntries('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(c=>[c,'LS('+c+')'])),
+};
+
+function textToTapSteps(text){
+  return [...text].map(ch=>{
+    const kc=US_CHAR_MAP[ch];
+    if(!kc) return null;
+    return {type:'tap', key:`&kp ${kc}`};
+  }).filter(Boolean);
+}
+
+function getMacro(i){ return state.macroDefs[i]||{label:`mc${i}`,display_name:'',steps:[]}; }
+
+function macroPairId(){
+  return `pair_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;
+}
+
+function normalizeMacroPairId(raw){
+  const s=(raw||'').toString().trim();
+  return /^[A-Za-z0-9_-]{1,64}$/.test(s) ? s : '';
+}
+
+function isMacroPairableStep(step){
+  return step && (step.type==='press' || step.type==='release');
+}
+
+const MACRO_PAIR_COLORS=[
+  'hsl(12 86% 68%)',
+  'hsl(205 84% 70%)',
+  'hsl(126 58% 61%)',
+  'hsl(286 72% 72%)',
+  'hsl(45 92% 66%)',
+  'hsl(343 78% 68%)',
+  'hsl(168 63% 58%)',
+  'hsl(228 75% 73%)',
+  'hsl(92 58% 60%)',
+  'hsl(312 72% 69%)',
+  'hsl(26 82% 64%)',
+  'hsl(188 70% 63%)',
+];
+
+function macroPairColorAt(index){
+  if(index<MACRO_PAIR_COLORS.length) return MACRO_PAIR_COLORS[index];
+  const extra=index-MACRO_PAIR_COLORS.length;
+  const hue=(extra*137.508)%360;
+  const sat=68+(extra%3)*5;
+  const light=60+((Math.floor(extra/3)%3)-1)*5;
+  return `hsl(${hue.toFixed(1)} ${sat}% ${light}%)`;
+}
+
+function buildMacroPairColorMap(groups){
+  const entries=[...groups.entries()].sort((a,b)=>{
+    const ai=a[1].firstIdx ?? Number.MAX_SAFE_INTEGER;
+    const bi=b[1].firstIdx ?? Number.MAX_SAFE_INTEGER;
+    if(ai!==bi) return ai-bi;
+    return a[0].localeCompare(b[0]);
+  });
+  const colorMap=new Map();
+  entries.forEach(([pairId],idx)=>colorMap.set(pairId, macroPairColorAt(idx)));
+  return colorMap;
+}
+
+function defaultMacroStep(type){
+  if(type==='tap'||type==='press'||type==='release') return {type,key:'&kp A'};
+  if(type==='wait') return {type,ms:50};
+  if(type==='tap_time') return {type,ms:5};
+  if(type==='pause_for_release') return {type};
+  if(type==='text') return {type,text:''};
+  return {type:'tap',key:'&kp A'};
+}
+
+function convertMacroStep(step, newType){
+  const base=defaultMacroStep(newType);
+  if((newType==='tap'||newType==='press'||newType==='release')&&step.key) base.key=step.key;
+  if((newType==='wait'||newType==='tap_time')&&step.ms!==undefined) base.ms=step.ms;
+  if(newType==='text'&&step.text!==undefined) base.text=step.text;
+  return base;
+}
+
+function inferMacroPairIds(macro){
+  const steps=macro?.steps||[];
+  const pending=new Map();
+  for(let i=0;i<steps.length;i++){
+    const step=steps[i];
+    if(!isMacroPairableStep(step)) continue;
+    const key=(step.key||'').trim();
+    step.pair_id=normalizeMacroPairId(step.pair_id);
+    if(!key || step.pair_id) continue;
+    if(step.type==='press'){
+      if(!pending.has(key)) pending.set(key,[]);
+      pending.get(key).push(i);
+    } else {
+      const stack=pending.get(key);
+      if(stack?.length){
+        const pressIdx=stack.pop();
+        const pairId=macroPairId();
+        steps[pressIdx].pair_id=pairId;
+        step.pair_id=pairId;
+        if(!stack.length) pending.delete(key);
+      }
+    }
+  }
+}
+
+function hydrateMacroDefs(defs){
+  (defs||[]).forEach(macro=>inferMacroPairIds(macro));
+  return defs;
+}
+
+
+function macroBindingPreview(macro){
+  if(!macro.steps||!macro.steps.length) return '(empty)';
+  const parts=macro.steps.map(s=>{
+    if(s.type==='tap') return `tap(${(s.key||'').replace(/^&kp\s*/,'')})`;
+    if(s.type==='press') return `press(${(s.key||'').replace(/^&kp\s*/,'')})`;
+    if(s.type==='release') return `rel(${(s.key||'').replace(/^&kp\s*/,'')})`;
+    if(s.type==='wait') return `wait(${s.ms||0}ms)`;
+    if(s.type==='tap_time') return `tap_time(${s.ms||0}ms)`;
+    if(s.type==='pause_for_release') return `pause`;
+    if(s.type==='text') return `text("${(s.text||'').slice(0,10)}${(s.text||'').length>10?'...':''}") `;
+    return s.type;
+  });
+  return parts.join(' \u2192 ');
+}
+
+function buildMacroPairState(macro){
+  inferMacroPairIds(macro);
+  const steps=macro?.steps||[];
+  const perStep=new Map();
+  const groups=new Map();
+  steps.forEach((step,idx)=>{
+    if(!isMacroPairableStep(step)) return;
+    const pairId=normalizeMacroPairId(step.pair_id);
+    if(!pairId){
+      perStep.set(idx,{
+        matched:false,
+        role:step.type,
+        warn:step.type==='press'
+          ? 'この press には対応する release がありません'
+          : 'この release には対応する press がありません',
+      });
+      return;
+    }
+    if(!groups.has(pairId)) groups.set(pairId,{press:[],release:[],firstIdx:idx});
+    const group=groups.get(pairId);
+    group[step.type].push(idx);
+    if(idx<group.firstIdx) group.firstIdx=idx;
+  });
+  const colorMap=buildMacroPairColorMap(groups);
+  const pairs=[];
+  groups.forEach((group,pairId)=>{
+    const color=colorMap.get(pairId);
+    if(group.press.length===1 && group.release.length===1){
+      const pressIdx=group.press[0];
+      const releaseIdx=group.release[0];
+      const orderWarn=releaseIdx < pressIdx
+        ? '対応順が逆です。press を release より前に並べてください'
+        : '';
+      const shared={
+        matched:true,
+        pairId,
+        color,
+        warn:orderWarn,
+      };
+      perStep.set(pressIdx,{...shared,role:'press',counterpartIdx:releaseIdx});
+      perStep.set(releaseIdx,{...shared,role:'release',counterpartIdx:pressIdx});
+      return;
+    }
+    group.press.forEach(idx=>{
+      perStep.set(idx,{
+        matched:false,
+        role:'press',
+        pairId,
+        color,
+        warn:'この press の対応先は壊れています。release を生成し直してください',
+      });
+    });
+    group.release.forEach(idx=>{
+      perStep.set(idx,{
+        matched:false,
+        role:'release',
+        pairId,
+        color,
+        warn:'この release の対応先は壊れています。press を生成し直してください',
+      });
+    });
+  });
+  return {perStep};
+}
+
+function getMacroPairInsertIndexForPress(steps, pressIdx){
+  if(steps[pressIdx+1]?.type==='pause_for_release') return pressIdx+2;
+  return pressIdx+1;
+}
+
+function getMacroPairInsertIndexForRelease(steps, releaseIdx){
+  if(steps[releaseIdx-1]?.type==='pause_for_release') return releaseIdx-1;
+  return releaseIdx;
+}
+
+function createMacroPairForPress(slot, pressIdx){
+  const macro=getMacro(slot);
+  const steps=macro.steps||[];
+  const step=steps[pressIdx];
+  if(!step || step.type!=='press') return;
+  const pairState=buildMacroPairState(macro);
+  if(pairState.perStep.get(pressIdx)?.matched) return;
+  const pairId=normalizeMacroPairId(step.pair_id)||macroPairId();
+  step.pair_id=pairId;
+  steps.splice(getMacroPairInsertIndexForPress(steps, pressIdx), 0, {type:'release', key:step.key||'&kp A', pair_id:pairId});
+  markUnsaved();
+  renderMacroStepEditor(slot);
+}
+
+function createMacroPairForRelease(slot, releaseIdx){
+  const macro=getMacro(slot);
+  const steps=macro.steps||[];
+  const step=steps[releaseIdx];
+  if(!step || step.type!=='release') return;
+  const pairState=buildMacroPairState(macro);
+  if(pairState.perStep.get(releaseIdx)?.matched) return;
+  const pairId=normalizeMacroPairId(step.pair_id)||macroPairId();
+  step.pair_id=pairId;
+  steps.splice(getMacroPairInsertIndexForRelease(steps, releaseIdx), 0, {type:'press', key:step.key||'&kp A', pair_id:pairId});
+  markUnsaved();
+  renderMacroStepEditor(slot);
+}
+
+function syncMacroPairKey(slot, stepIdx){
+  const macro=getMacro(slot);
+  const pairState=buildMacroPairState(macro);
+  const meta=pairState.perStep.get(stepIdx);
+  if(!meta?.matched) return;
+  const step=macro.steps?.[stepIdx];
+  const target=macro.steps?.[meta.counterpartIdx];
+  if(step?.key && target && target.key!==step.key){
+    target.key=step.key;
+  }
+}
+
+function changeMacroStepType(slot, stepIdx, newType){
+  const steps=state.macroDefs[slot].steps;
+  const converted=convertMacroStep(steps[stepIdx], newType);
+  steps[stepIdx]=converted;
+  if(newType==='press'){
+    const pairId=macroPairId();
+    steps[stepIdx].pair_id=pairId;
+    steps.splice(getMacroPairInsertIndexForPress(steps, stepIdx), 0, {type:'release', key:converted.key||'&kp A', pair_id:pairId});
+  }
+  markUnsaved();
+  renderMacroStepEditor(slot);
+}
+
+function addMacroStep(slot, type){
+  const steps=state.macroDefs[slot].steps;
+  steps.push(defaultMacroStep(type));
+  if(type==='press'){
+    const pressIdx=steps.length-1;
+    const pairId=macroPairId();
+    steps[pressIdx].pair_id=pairId;
+    steps.push({type:'release', key:steps[pressIdx].key||'&kp A', pair_id:pairId});
+  }
+  markUnsaved();
+  renderMacroStepEditor(slot);
+}
+
+
+function renderMacroList(){
+  const ul=document.getElementById('macro-list-panel');
+  if(!ul) return;
+  ul.innerHTML='';
+  for(let i=0;i<MACRO_COUNT;i++){
+    const m=getMacro(i);
+    const li=document.createElement('div');
+    li.className='macro-list-item'+(state.macroSelectedSlot===i?' active':'');
+    li.innerHTML=`<span class="macro-list-label">mc${i}</span>`+
+      `<span class="macro-list-name">${m.display_name||'(unnamed)'}</span>`;
+    li.onclick=(()=>{const idx=i;return()=>{state.macroSelectedSlot=idx;renderMacroTab();};})();
+    ul.appendChild(li);
+  }
+}
+
+function restoreSelectedMacroSource(){
+  const select=document.getElementById('macro-restore-select');
+  const source=select?.value||'';
+  if(!source) return;
+  const sourceMacros=state.settingsMeta?.per_folder_macros?.[source];
+  if(!sourceMacros){
+    setStatus('復元元のマクロ設定が見つかりませんでした。','s-err');
+    return;
+  }
+  const confirmed=confirm(`このフォルダの保存済みマクロ設定を現在の編集内容へ読み込みますか？\n${source}`);
+  if(!confirmed) return;
+  state.macroDefs=hydrateMacroDefs(sourceMacros);
+  state.macroSelectedSlot=0;
+  markUnsaved();
+  renderMacroTab();
+  renderKeyboard();
+  setStatus('保存済みマクロ設定を読み込みました。Save All で反映できます。','s-ok');
+}
+
+const STEP_TYPE_DESC={
+  tap:'tap — キーを押して離す（通常のキー入力）',
+  press:'press — キーを押し続ける（モディファイア等の保持に）',
+  release:'release — 押し続けていたキーを離す',
+  wait:'wait — 指定ミリ秒待機する',
+  tap_time:'tap_time — 以降のキー操作で押している時間をms単位で設定する',
+  pause_for_release:'pause_for_release — マクロを起動したキーが離されるまで待機する',
+  text:'text — ASCII文字列を入力する（▶展開でプレビュー、保存時に自動展開）',
+};
+function renderMacroStepRow(slot, stepIdx, step, pairMeta=null){
+  const warnMsg=pairMeta?.warn||'';
+  const row=document.createElement('div');
+  row.className='macro-step';
+  row.dataset.stepIdx=stepIdx;
+  row.draggable=true;
+  // 入力欄上でのマウスドラッグをステップ並び替えに吸われないようにする
+  row.addEventListener('mousedown', e=>{
+    if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA'){
+      row.draggable=false;
+      document.addEventListener('mouseup',()=>{ row.draggable=true; },{once:true});
+    }
+  });
+  if(pairMeta?.matched){
+    row.classList.add('step-paired');
+    row.style.setProperty('--pair-color', pairMeta.color);
+  }
+  if(warnMsg){
+    row.classList.add('step-warn');
+    row.style.flexWrap='wrap';
+  }
+
+  // drag handle
+  const handle=document.createElement('span');
+  handle.className='macro-step-drag'; handle.textContent='⠿'; handle.title='Drag to reorder';
+  row.appendChild(handle);
+
+  // step number
+  const num=document.createElement('span');
+  num.className='macro-step-num'; num.textContent=stepIdx+1;
+  row.appendChild(num);
+
+  // type selector
+  const typesSel=document.createElement('select');
+  typesSel.className='macro-step-type-sel';
+  typesSel.title=STEP_TYPE_DESC[step.type]||step.type;
+  ['tap','press','release','wait','tap_time','pause_for_release','text'].forEach(t=>{
+    const o=document.createElement('option');
+    o.value=t; o.textContent=t; o.title=STEP_TYPE_DESC[t]||t; if(t===step.type) o.selected=true;
+    typesSel.appendChild(o);
+  });
+  typesSel.onchange=()=>{
+    typesSel.title=STEP_TYPE_DESC[typesSel.value]||typesSel.value;
+    changeMacroStepType(slot, stepIdx, typesSel.value);
+  };
+  row.appendChild(typesSel);
+  if(pairMeta?.matched){
+    const badge=document.createElement('span');
+    badge.className='macro-step-pair-badge';
+    badge.textContent=pairMeta.role==='press'
+      ? `release #${pairMeta.counterpartIdx+1}`
+      : `press #${pairMeta.counterpartIdx+1}`;
+    badge.title=`対応先: Step ${pairMeta.counterpartIdx+1}`;
+    row.appendChild(badge);
+  }
+
+  // detail area
+  if(step.type==='tap'||step.type==='press'||step.type==='release'){
+    const raw=step.key||'&kp A';
+    const km=raw.match(/^&(kp|mo|lt|mt|tog|to)\s+(.+)$/);
+    const isActive=isPaletteTarget('macro-step',{slot,stepIdx});
+    const slot_btn=document.createElement('button');
+    slot_btn.className='macro-step-key-slot'+(isActive?' pal-target':'');
+    slot_btn.textContent=km?km[2]:raw;
+    slot_btn.title='Click to assign key';
+    slot_btn.onclick=()=>{
+      if(isPaletteTarget('macro-step',{slot,stepIdx})){ clearPaletteContext(); return; }
+      activatePaletteContext({
+        tab:'macro',
+        title:`mc${slot} Step ${stepIdx+1} (${step.type})`,
+        note:'キーをクリックしてステップに割り当てます。',
+        catIds:DEFAULT_BINDING_CAT_IDS,
+        initialCat:'basic',
+        target:{type:'macro-step',slot,stepIdx},
+        onPick:(raw)=>{
+          if(needsFollowUpPicker(raw)){
+            openTemplateFollowUpPicker({
+              tab:'macro',
+              title:`mc${slot} Step ${stepIdx+1} (${step.type}) — キーを選択`,
+              note:'Quantum テンプレートに埋め込むキーを選びます。',
+              template:raw,
+              target:{type:'macro-step',slot,stepIdx},
+              onComplete:(completed)=>{
+                state.macroDefs[slot].steps[stepIdx].key=completed;
+                syncMacroPairKey(slot,stepIdx);
+                markUnsaved();
+                clearPaletteContext();
+                renderMacroStepEditor(slot);
+              },
+            });
+            return;
+          }
+          state.macroDefs[slot].steps[stepIdx].key=raw;
+          syncMacroPairKey(slot, stepIdx);
+          markUnsaved();
+          clearPaletteContext();
+          renderMacroStepEditor(slot);
+        },
+      });
+    };
+    slot_btn.addEventListener('dragover', e=>{e.preventDefault(); e.dataTransfer.dropEffect='copy';});
+    slot_btn.addEventListener('dragenter', e=>{e.preventDefault(); slot_btn.classList.add('pal-target');});
+    slot_btn.addEventListener('dragleave', ()=>{ if(!isPaletteTarget('macro-step',{slot,stepIdx})) slot_btn.classList.remove('pal-target'); });
+    slot_btn.addEventListener('drop', e=>{
+      e.preventDefault();
+      slot_btn.classList.remove('pal-target');
+      const raw=e.dataTransfer.getData('text/plain'); if(!raw) return;
+      const applyKey=(k)=>{
+        state.macroDefs[slot].steps[stepIdx].key=k;
+        syncMacroPairKey(slot,stepIdx);
+        markUnsaved();
+        renderMacroStepEditor(slot);
+      };
+      if(needsFollowUpPicker(raw)){
+        activatePaletteContext({
+          tab:'macro',
+          title:`mc${slot} Step ${stepIdx+1} (${step.type}) — キーを選択`,
+          note:'Quantum テンプレートに埋め込むキーを選びます。',
+          catIds:KEYCODE_CONTEXT_CAT_IDS,
+          initialCat:'basic',
+          target:{type:'macro-step',slot,stepIdx},
+          onPick:(pickedRaw)=>{
+            const completed=completeTemplateBinding(raw, pickedRaw);
+            if(!completed) return;
+            applyKey(completed);
+            clearPaletteContext();
+          },
+        });
+        return;
+      }
+      applyKey(raw);
+    });
+    row.appendChild(slot_btn);
+  } else if(step.type==='wait'||step.type==='tap_time'){
+    const wrap=document.createElement('div');
+    wrap.className='macro-step-ms';
+    const inp=document.createElement('input');
+    inp.type='number'; inp.min='1'; inp.max='30000';
+    inp.value=step.ms!==undefined?step.ms:(step.type==='wait'?50:5);
+    inp.oninput=()=>{state.macroDefs[slot].steps[stepIdx].ms=parseInt(inp.value)||1; markUnsaved();};
+    const lbl=document.createElement('span'); lbl.textContent='ms';
+    wrap.appendChild(inp); wrap.appendChild(lbl);
+    row.appendChild(wrap);
+  } else if(step.type==='pause_for_release'){
+    const lbl=document.createElement('span');
+    lbl.className='macro-step-pause'; lbl.textContent='pause for release';
+    row.appendChild(lbl);
+  } else if(step.type==='text'){
+    row.style.flexWrap='wrap';
+    const wrap=document.createElement('div');
+    wrap.className='macro-step-text';
+
+    const inp=document.createElement('input');
+    inp.type='text'; inp.value=step.text||''; inp.placeholder='ASCII text (e.g. Hello!)';
+    inp.setAttribute('lang','en'); inp.setAttribute('autocomplete','off'); inp.setAttribute('autocorrect','off');
+
+    const warnDiv=document.createElement('div');
+    warnDiv.className='macro-step-text-warn';
+
+    let previewDiv=null;
+    const expBtn=document.createElement('button');
+    expBtn.className='macro-step-expand-btn';
+
+    const updatePreview=()=>{
+      if(!previewDiv) return;
+      previewDiv.innerHTML='';
+      const taps=textToTapSteps(inp.value);
+      if(!taps.length){ const s=document.createElement('span'); s.style.color='var(--dim)'; s.style.fontSize='11px'; s.textContent='(変換できる文字なし)'; previewDiv.appendChild(s); return; }
+      taps.forEach(t=>{
+        const b=document.createElement('span'); b.className='macro-tap-badge';
+        b.textContent=(t.key||'').replace(/^&kp\s+/,''); previewDiv.appendChild(b);
+      });
+    };
+
+    const checkWarn=(val)=>{
+      const bad=[...val].filter(ch=>!(ch in US_CHAR_MAP));
+      if(bad.length){
+        row.classList.add('step-warn');
+        warnDiv.textContent='変換不可の文字: '+[...new Set(bad)].map(c=>JSON.stringify(c)).join(', ');
+      } else {
+        row.classList.remove('step-warn');
+        warnDiv.textContent='';
+      }
+    };
+
+    inp.addEventListener('beforeinput',e=>{
+      if(e.inputType==='insertText'&&e.data){
+        const blocked=[...e.data].filter(ch=>!(ch in US_CHAR_MAP));
+        if(blocked.length) e.preventDefault();
+      }
+    });
+    inp.oninput=()=>{
+      // strip any chars that slipped through (e.g. paste, IME)
+      const filtered=[...inp.value].filter(ch=>ch in US_CHAR_MAP).join('');
+      if(filtered!==inp.value) inp.value=filtered;
+      state.macroDefs[slot].steps[stepIdx].text=inp.value;
+      markUnsaved();
+      checkWarn(inp.value);
+      updatePreview();
+    };
+
+    expBtn.textContent='▶ 展開';
+    expBtn.title='text ステップが展開されるキー列をプレビュー（状態は変わりません）';
+    expBtn.onclick=()=>{
+      if(previewDiv){ previewDiv.remove(); previewDiv=null; expBtn.textContent='▶ 展開'; }
+      else {
+        previewDiv=document.createElement('div'); previewDiv.className='macro-step-text-preview';
+        updatePreview();
+        row.appendChild(previewDiv);
+        expBtn.textContent='▼ 折り畳む';
+      }
+    };
+
+    checkWarn(step.text||'');
+    wrap.appendChild(inp); wrap.appendChild(expBtn);
+    row.appendChild(wrap);
+    if(warnDiv.textContent) row.appendChild(warnDiv);
+  }
+
+  if(!pairMeta?.matched && (step.type==='press'||step.type==='release')){
+    const linkBtn=document.createElement('button');
+    linkBtn.className='macro-step-link-btn';
+    linkBtn.textContent=step.type==='press' ? 'release生成' : 'press生成';
+    linkBtn.title=step.type==='press' ? '対応する release ステップを生成' : '対応する press ステップを生成';
+    linkBtn.onclick=()=>{
+      if(step.type==='press') createMacroPairForPress(slot, stepIdx);
+      else createMacroPairForRelease(slot, stepIdx);
+    };
+    row.appendChild(linkBtn);
+  }
+
+  // delete button
+  const delBtn=document.createElement('button');
+  delBtn.className='macro-step-del'; delBtn.textContent='×'; delBtn.title='Delete step';
+  delBtn.onclick=()=>{state.macroDefs[slot].steps.splice(stepIdx,1); markUnsaved(); renderMacroStepEditor(slot);};
+  row.appendChild(delBtn);
+
+  if(warnMsg){
+    const warn=document.createElement('div');
+    warn.className='macro-step-warn-msg';
+    warn.textContent=warnMsg;
+    row.appendChild(warn);
+  }
+
+  return row;
+}
+
+function renderMacroStepEditor(slot){
+  const macro=getMacro(slot);
+  const panel=document.getElementById('macro-editor-panel');
+  if(!panel) return;
+  panel.innerHTML='';
+
+  // header: label + display name
+  const hdr=document.createElement('div');
+  hdr.className='macro-name-row';
+  hdr.innerHTML=`<strong>mc${slot}</strong>&nbsp;`;
+  const dnInp=document.createElement('input');
+  dnInp.type='text'; dnInp.className='macro-dn-inp';
+  dnInp.placeholder='Display name (shown on key)';
+  dnInp.value=macro.display_name||'';
+  dnInp.oninput=()=>{
+    state.macroDefs[slot].display_name=dnInp.value;
+    markUnsaved();
+    renderMacroList();
+    renderKeyboard();
+  };
+  hdr.appendChild(dnInp);
+  panel.appendChild(hdr);
+
+  // binding preview
+  const prev=document.createElement('div');
+  prev.className='macro-binding-preview';
+  prev.textContent=macroBindingPreview(macro);
+  panel.appendChild(prev);
+
+  // step list
+  // step list with drag-and-drop
+  const stepList=document.createElement('div');
+  stepList.className='macro-step-list';
+  const pairState=buildMacroPairState(macro);
+  let _dragSrcIdx=null;
+  (macro.steps||[]).forEach((step,i)=>{
+    const row=renderMacroStepRow(slot,i,step,pairState.perStep.get(i)||null);
+    row.addEventListener('dragstart',e=>{
+      _dragSrcIdx=i;
+      row.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move';
+    });
+    row.addEventListener('dragend',()=>{
+      row.classList.remove('dragging');
+      stepList.querySelectorAll('.macro-step').forEach(r=>r.classList.remove('drag-target-above','drag-target-below'));
+    });
+    row.addEventListener('dragover',e=>{
+      e.preventDefault(); e.dataTransfer.dropEffect='move';
+      if(_dragSrcIdx===null||_dragSrcIdx===i) return;
+      stepList.querySelectorAll('.macro-step').forEach(r=>r.classList.remove('drag-target-above','drag-target-below'));
+      row.classList.add(i>_dragSrcIdx?'drag-target-below':'drag-target-above');
+    });
+    row.addEventListener('dragleave',()=>{
+      row.classList.remove('drag-target-above','drag-target-below');
+    });
+    row.addEventListener('drop',e=>{
+      e.preventDefault();
+      const src=_dragSrcIdx; const dst=i;
+      if(src===null||src===dst) return;
+      const steps=state.macroDefs[slot].steps;
+      const [moved]=steps.splice(src,1);
+      steps.splice(dst,0,moved);
+      _dragSrcIdx=null;
+      markUnsaved();
+      renderMacroStepEditor(slot);
+    });
+    stepList.appendChild(row);
+  });
+  // add step bar
+  const addBar=document.createElement('div');
+  addBar.className='macro-add-bar';
+  const addSel=document.createElement('select');
+  ['tap','press','release','wait','tap_time','pause_for_release','text'].forEach(t=>{
+    const o=document.createElement('option'); o.value=t; o.textContent=t; o.title=STEP_TYPE_DESC[t]||t; addSel.appendChild(o);
+  });
+  addSel.title=STEP_TYPE_DESC[addSel.value]||addSel.value;
+  addSel.onchange=()=>{ addSel.title=STEP_TYPE_DESC[addSel.value]||addSel.value; };
+  const addBtn=document.createElement('button');
+  addBtn.textContent='+ Add Step';
+  addBtn.onclick=()=>{ addMacroStep(slot, addSel.value); };
+  addBar.appendChild(addSel); addBar.appendChild(addBtn);
+  panel.appendChild(addBar);
+  panel.appendChild(stepList);
+}
+
+function renderMacroTab(){
+  syncMacroRestoreControls();
+  renderMacroList();
+  renderMacroStepEditor(state.macroSelectedSlot);
+  renderPalette();
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.ctrlKey&&e.key==='s'){ e.preventDefault(); saveAll(); }
+  if(e.key==='Escape'){ closeKeyEdit(); closeSettings(); closeMtEdit(); closeKeyPicker(); closeBindingPicker(); closeComboKbPicker(); }
+  if(e.key==='Enter'&&document.getElementById('key-edit-ov').classList.contains('open')) applyKeyEdit();
+});
+window.addEventListener('resize',schedulePaletteSlotLayout);
+
+// 笏笏 蛻晄悄蛹・笏笏
+async function init(){
+  const s=await api('/api/settings');
+  applySettingsMeta(s);
+  if(s.td_definitions) state.tdDefs=s.td_definitions;
+  if(s.macro_definitions) state.macroDefs=hydrateMacroDefs(s.macro_definitions);
+  renderPalette();
+  const r=await api('/api/keymap');
+  if(!r.error){
+    state.layers=r.layers; state.currentLayer=0;
+    state.combos=r.combos||[];
+    state.conditionalLayers=r.conditional_layers||[];
+    state.tdDefs=r.td_definitions||state.tdDefs;
+    if(r.macro_definitions) state.macroDefs=hydrateMacroDefs(r.macro_definitions);
+    injectCustomPalette(r.custom_bindings||[]);
+    document.getElementById('file-status').textContent=r.path;
+    document.getElementById('status-info').textContent=`${r.layers.length} layers / ${(r.layers[0]?.bindings||[]).length} keys`;
+    document.getElementById('no-data-box').classList.add('d-none');
+    document.getElementById('keyboard').classList.remove('d-none');
+    renderLayerBtns(); renderKeyboard(); renderPalette(); renderTpGestureKeys(); renderModTapTab(); renderComboTab(); renderConditionalTab(); renderMacroTab(); markSaved();
+    setStatus('Loaded','s-ok');
+  } else { setStatus('Open settings and choose the firmware folder first.','s-warn'); }
+  ['left','right','main'].forEach(side=>loadConfig(side).catch(()=>{}));
+}
+init();
+</script>
+
+</body>
+</html>
