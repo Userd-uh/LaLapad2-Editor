@@ -165,6 +165,9 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
 .rot-btn{padding:2px 7px;border-radius:3px;border:1px solid var(--bdr2);background:var(--bg3);
   color:var(--dim);cursor:pointer;font-size:10px;}
 .rot-btn.active{background:var(--a2);color:#fff;border-color:var(--a2);}
+.sselect{min-width:132px;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);
+  padding:3px 7px;border-radius:3px;font-size:11px;}
+.sselect:focus{outline:none;border-color:var(--a2);}
 
 /* Gesture section in trackpad tab */
 .gest-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:5px;}
@@ -386,6 +389,24 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
 .macro-restore-select{min-width:260px;max-width:min(42vw,520px);background:var(--bg);border:1px solid var(--bdr2);color:var(--text);padding:4px 6px;border-radius:3px;font-size:11px;height:30px;}
 .macro-restore-select:focus{outline:none;border-color:var(--a2);}
 .macro-current-path{font-size:10px;color:var(--muted);max-width:min(32vw,420px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.device-panel{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px;}
+.device-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.device-status{font-size:12px;color:var(--dim);}
+.device-status.ok{color:var(--ok);}
+.device-status.warn{color:var(--warn);}
+.device-status.err{color:var(--err);}
+.device-note{font-size:11px;color:var(--dim);line-height:1.55;}
+.device-log{min-height:110px;max-height:260px;overflow:auto;background:var(--bg);border:1px solid var(--bdr);border-radius:4px;padding:8px;font-family:Consolas,monospace;font-size:11px;color:var(--dim);white-space:pre-wrap;}
+.device-kv{display:grid;grid-template-columns:150px 1fr;gap:6px 10px;font-size:11px;color:var(--dim);}
+.device-kv b{color:var(--text);font-weight:600;}
+.device-diag{font-size:11px;color:var(--dim);line-height:1.45;margin-top:8px;white-space:pre-wrap;}
+.device-diag.ok{color:var(--ok);}
+.device-diag.warn{color:var(--warn);}
+.device-diag.err{color:var(--err);}
+.firmware-grid{display:grid;grid-template-columns:130px 1fr;gap:6px 8px;align-items:center;margin-top:10px;}
+.firmware-grid label{font-size:11px;color:var(--dim);}
+.firmware-grid input{background:var(--bg);border:1px solid var(--bdr2);color:var(--text);padding:5px 7px;border-radius:3px;font-size:11px;min-width:0;}
+.firmware-grid input:focus{outline:none;border-color:var(--a2);}
 </style>
 </head>
 <body>
@@ -395,6 +416,7 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
   <span class="file-status" id="file-status">No file loaded</span>
   <button class="btn" onclick="openSettings()">Settings</button>
   <button class="btn primary" id="save-btn" onclick="saveAll()" title="Ctrl+S">Save All</button>
+  <button class="btn blue" onclick="writeFullFirmwareNow()" title="Save, build, and copy UF2">Write MCU</button>
   <span class="unsaved d-none" id="unsaved-dot" title="Unsaved changes">*</span>
 </header>
 
@@ -406,6 +428,7 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
   <div class="main-tab" onclick="switchTab('modtap')">TapDance</div>
   <div class="main-tab" onclick="switchTab('combo')">Combo</div>
   <div class="main-tab" onclick="switchTab('macro')">Macro</div>
+  <div class="main-tab" onclick="switchTab('device')">Device</div>
 </div>
 
 <div id="tab-keymap" class="tab-pane active">
@@ -458,6 +481,60 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
   </div>
   <div class="settings-grid" id="tp-settings"></div>
   <div class="tab-palette-slot" id="pal-slot-trackpad"></div>
+</div>
+
+<div id="tab-device" class="tab-pane">
+  <div class="device-panel">
+    <div class="sect">
+      <div class="sect-hdr">
+        <h3>MCU Write</h3>
+        <span class="device-status" id="device-status">Disconnected</span>
+      </div>
+      <div class="device-row">
+        <button class="btn primary" onclick="connectDevice('usb')">Connect USB</button>
+        <button class="btn blue" onclick="connectDevice('ble')">Connect Bluetooth</button>
+        <button class="btn" onclick="disconnectDevice()">Disconnect</button>
+        <button class="btn primary" onclick="writeDeviceNow()">Write RPC keymap</button>
+        <button class="btn blue" onclick="writeFullFirmwareNow()">Full firmware write</button>
+        <button class="btn" onclick="testUsbSerialDialog()">Test USB Dialog</button>
+        <label class="toggle" title="接続中のマイコンへキー割当の変更を短い待ち時間で反映します">
+          <input type="checkbox" id="device-realtime" onchange="setDeviceRealtime(this.checked)">
+          <span class="tsl"></span>
+        </label>
+        <span style="font-size:11px;color:var(--dim)">Realtime keymap write</span>
+      </div>
+      <div class="device-kv" style="margin-top:10px">
+        <b>Transport</b><span id="device-transport">-</span>
+        <b>Device</b><span id="device-label">-</span>
+        <b>RPC writable</b><span id="device-writable">Layer key bindings supported by ZMK Studio RPC</span>
+        <b>Firmware writable</b><span>Tap dance, macro, combo, conditional layers, and .conf/Kconfig via build + UF2 copy</span>
+      </div>
+      <p class="device-note" style="margin-top:10px">
+        RPC書き込みはZMK Studioの即時反映です。Full firmware write は Save All の内容をビルドし、生成済みUF2をブートローダードライブへコピーします。
+      </p>
+      <div class="firmware-grid">
+        <label>Build command</label>
+        <input type="text" id="fw-build-command" placeholder='例: west build -p -d build/right -b seeeduino_xiao_ble -- -DSHIELD="lalapadgen2_right rgbled_adapter" -DZMK_CONFIG="{config_dir}"'>
+        <label>Build cwd</label>
+        <input type="text" id="fw-build-cwd" placeholder="例: D:\zmk-workspace\zmk\app">
+        <label>UF2 file</label>
+        <input type="text" id="fw-uf2-path" placeholder="例: D:\zmk-workspace\zmk\app\build\right\zephyr\zmk.uf2">
+        <label>Flash target</label>
+        <input type="text" id="fw-flash-target" placeholder="例: E:&#92;">
+      </div>
+      <div class="device-row" style="margin-top:8px">
+        <button class="btn" onclick="saveFirmwareSettings()">Save firmware settings</button>
+        <button class="btn blue" onclick="buildFirmwareNow()">Save all + Build</button>
+        <button class="btn primary" onclick="flashFirmwareNow()">Flash UF2</button>
+        <button class="btn" onclick="refreshFirmwareStatus()">Refresh firmware paths</button>
+      </div>
+      <div class="device-diag" id="device-usb-diag"></div>
+    </div>
+    <div class="sect">
+      <div class="sect-hdr"><h3>Write Log</h3></div>
+      <div class="device-log" id="device-log"></div>
+    </div>
+  </div>
 </div>
 
 <div id="tab-general" class="tab-pane">
@@ -662,7 +739,7 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
 // 笏笏 螳壽焚 笏笏
 const MOD_PH = 'XXXXXXXX'; // 菫ｮ鬟ｾ繧ｭ繝ｼ繝ｩ繝・ヱ繝ｼ縺ｮ繝励Ξ繝ｼ繧ｹ繝帙Ν繝繝ｼ
 const SCALE=0.58, GAP=3, TD_COUNT=32, MACRO_COUNT=16;
-const TAB_NAMES=['keymap','trackpad','general','conditional','modtap','combo','macro'];
+const TAB_NAMES=['keymap','trackpad','general','conditional','modtap','combo','macro','device'];
 const MACRO_RE=/^&mc(\d+)$/;
 
 function repairQuantumModifiedBinding(raw){
@@ -703,8 +780,8 @@ const TP_GESTURES=[
   {slot:'Tap1',label:'1本指タップ'},
   {slot:'Tap2',label:'2本指タップ'},
   {slot:'Tap3',label:'3本指タップ'},
-  {slot:'SwpR',label:'3本指スワイプ右'},
-  {slot:'SwpL',label:'3本指スワイプ左'},
+  {slot:'SwpR',label:'横スワイプ右（3本指 / 2本指ナビ）'},
+  {slot:'SwpL',label:'横スワイプ左（3本指 / 2本指ナビ）'},
   {slot:'SwpU',label:'3本指スワイプ上'},
   {slot:'SwpD',label:'3本指スワイプ下'},
   {slot:'Pinch',label:'2本指ピンチ修飾キー'},
@@ -772,6 +849,9 @@ function modWrap(prefix,label,title=''){
   );
 }
 function mtFieldChoice(expr,label,title=''){ return palItem(expr,label,title); }
+function mt2Wrap(hold,label,title=''){
+  return palItem(`&mt2 ${hold} ${MOD_PH}`, `${label}\n(kc)`, title || `Hold ${label}, tap key`);
+}
 function abbreviateKeycodeToken(token){
   return {
     SYSTEM:'SYS', POWER:'PWR', SLEEP:'SLP', WAKE:'WAKE',
@@ -1003,14 +1083,14 @@ const PAL_CATS=[
   {id:'basic',label:'蝓ｺ譛ｬ (QWERTY)',type:'qwerty'},
   {id:'fn',label:'Fn',keys:Array.from({length:15},(_,i)=>({r:`&kp F${i+1}`,l:`F${i+1}`}))},
   {id:'numpad',label:'繝・Φ繧ｭ繝ｼ',keys:[{r:'&kp KP_NUMBER_7',l:'K7'},{r:'&kp KP_NUMBER_8',l:'K8'},{r:'&kp KP_NUMBER_9',l:'K9'},{r:'&kp KP_PLUS',l:'K+'},{r:'&kp KP_NUMBER_4',l:'K4'},{r:'&kp KP_NUMBER_5',l:'K5'},{r:'&kp KP_NUMBER_6',l:'K6'},{r:'&kp KP_MINUS',l:'K-'},{r:'&kp KP_NUMBER_1',l:'K1'},{r:'&kp KP_NUMBER_2',l:'K2'},{r:'&kp KP_NUMBER_3',l:'K3'},{r:'&kp KP_ASTERISK',l:'K*'},{r:'&kp KP_NUMBER_0',l:'K0'},{r:'&kp KP_DOT',l:'K.'},{r:'&kp KP_DIVIDE',l:'K/'},{r:'&kp KP_NUMLOCK',l:'NLK'}]},
-  {id:'layer',label:'繝ｬ繧､繝､繝ｼ',keys:[{r:'&mo 1',l:'MO1'},{r:'&mo 2',l:'MO2'},{r:'&mo 3',l:'MO3'},{r:'&mo 4',l:'MO4'},{r:'&to 0',l:'TO0'},{r:'&to 1',l:'TO1'},{r:'&to 2',l:'TO2'},{r:'&to 3',l:'TO3'},{r:'&tog 1',l:'TG1'},{r:'&tog 2',l:'TG2'},{r:'&tap_dance_layer_1and2',l:'TD\n1&2'},{r:'&lt 1 SPACE',l:'LT1\nSPC'},{r:'&lt 2 SPACE',l:'LT2\nSPC'},{r:'&sl 1',l:'SL1'},{r:'&sl 2',l:'SL2'}]},
+  {id:'layer',label:'繝ｬ繧､繝､繝ｼ',keys:[{r:'&mo 1',l:'MO1(sys)'},{r:'&mo 2',l:'MO2(ter)'},{r:'&mo 3',l:'MO3(sec)'},{r:'&mo 4',l:'MO4'},{r:'&to 0',l:'TO0'},{r:'&to 1',l:'TO1'},{r:'&to 2',l:'TO2'},{r:'&to 3',l:'TO3'},{r:'&tog 1',l:'TG1'},{r:'&tog 2',l:'TG2'},{r:'&tap_dance_layer_1and2',l:'TD\n1&2'},{r:'&lt 1 SPACE',l:'LT1\nSPC'},{r:'&lt 2 SPACE',l:'LT2\nSPC'},{r:'&sl 1',l:'SL1'},{r:'&sl 2',l:'SL2'}]},
   {id:'mouse',label:'繝槭え繧ｹ',keys:[{r:'&mkp LCLK',l:'MB1'},{r:'&mkp RCLK',l:'MB2'},{r:'&mkp MCLK',l:'MB3'},{r:'&mkp MB4',l:'MB4'},{r:'&mkp MB5',l:'MB5'}]},
   {id:'bt',label:'BT',keys:[{r:'&bt BT_SEL 0',l:'BT0'},{r:'&bt BT_SEL 1',l:'BT1'},{r:'&bt BT_SEL 2',l:'BT2'},{r:'&bt BT_SEL 3',l:'BT3'},{r:'&bt BT_CLR',l:'CLR'},{r:'&bt BT_CLR_ALL',l:'CLRA'},{r:'&out OUT_TOG',l:'OUT'}]},
   {id:'quantum',label:'Quantum',type:'quantum_grouped',groups:QUANTUM_GROUPS},
   {id:'dyn',label:'繧ｹ繧ｱ繝ｼ繝ｫ',keys:[{r:'&zip_dyn_scale ZDS_XY ZDS_INC',l:'CUR\n+'},{r:'&zip_dyn_scale ZDS_XY ZDS_DEC',l:'CUR\n-'},{r:'&zip_dyn_scale ZDS_SC ZDS_INC',l:'SCL\n+'},{r:'&zip_dyn_scale ZDS_SC ZDS_DEC',l:'SCL\n-'},{r:'&zip_dyn_scale ZDS_ALL ZDS_RST',l:'RST\nALL'}]},
   {id:'td_pal',label:'TapDance',type:'td'},
 ];
-const BINDING_PICKER_CAT_IDS=['basic','layer','quantum','fn','mouse','app_media','bt','td_pal','macro_pal','dyn','custom','numpad_extra','system_keys','kbd_extra','kbd_app','intl_keys','consumer_keys','consumer_action','consumer_app','consumer_input'];
+const BINDING_PICKER_CAT_IDS=['basic','layer','quantum','modtap2','fn','mouse','app_media','bt','td_pal','macro_pal','dyn','custom','numpad_extra','system_keys','kbd_extra','kbd_app','intl_keys','consumer_keys','consumer_action','consumer_app','consumer_input'];
 const UI_QUANTUM_GROUPS=[
   {label:'One Shot Mod',keys:[
     palItem('&sk LSHIFT','OSM\nLSft','One-shot Left Shift'),
@@ -1174,6 +1254,26 @@ const MODIFIER_KEY_GROUPS=[
     mtFieldChoice('LG(LS(LA(LCTRL)))','Hyper','Left Ctrl + Left Shift + Left Alt + Left GUI'),
   ]},
 ];
+const MT2_GROUPS=[
+  {label:'Hold Key',keys:[
+    mt2Wrap('LEFT_SHIFT','LSft','Hold Left Shift, tap selected key'),
+    mt2Wrap('LEFT_CONTROL','LCtl','Hold Left Control, tap selected key'),
+    mt2Wrap('LEFT_ALT','LAlt','Hold Left Alt, tap selected key'),
+    mt2Wrap('LEFT_GUI','LGUI','Hold Left GUI, tap selected key'),
+    mt2Wrap('RIGHT_SHIFT','RSft','Hold Right Shift, tap selected key'),
+    mt2Wrap('RIGHT_CONTROL','RCtl','Hold Right Control, tap selected key'),
+    mt2Wrap('RIGHT_ALT','RAlt','Hold Right Alt, tap selected key'),
+    mt2Wrap('RIGHT_GUI','RGUI','Hold Right GUI, tap selected key'),
+    mt2Wrap('MINUS','-','Hold Minus, tap selected key'),
+    mt2Wrap('EQUAL','=','Hold Equal, tap selected key'),
+    mt2Wrap('LEFT_BRACKET','[','Hold Left Bracket, tap selected key'),
+    mt2Wrap('RIGHT_BRACKET',']','Hold Right Bracket, tap selected key'),
+    mt2Wrap('SEMI',';','Hold Semicolon, tap selected key'),
+    mt2Wrap('SQT',"'",'Hold Quote, tap selected key'),
+    mt2Wrap('ENTER','Enter','Hold Enter, tap selected key'),
+    mt2Wrap('BACKSLASH','\\','Hold Backslash, tap selected key'),
+  ]},
+];
 function getLayerPaletteRows(){
   const layers=getLayerIndices();
   const upperLayers=layers.filter(n=>n>0);
@@ -1200,6 +1300,7 @@ const PALETTE_CATS=[
   {id:'basic',label:'Basic',type:'qwerty'},
   {id:'layer',label:'Layers',type:'layer_dynamic'},
   {id:'quantum',label:'Quantum',type:'quantum_grouped',groups:UI_QUANTUM_GROUPS},
+  {id:'modtap2',label:'ModTap2',type:'quantum_grouped',groups:MT2_GROUPS},
   {id:'fn',label:'Fn',wrap:true,keys:Array.from({length:24},(_,i)=>({r:'&kp F'+(i+1),l:'F'+(i+1)}))},
   {id:'mouse',label:'Mouse',wrap:true,keys:[{r:'&mkp LCLK',l:'MB1'},{r:'&mkp RCLK',l:'MB2'},{r:'&mkp MCLK',l:'MB3'},{r:'&mkp MB4',l:'MB4'},{r:'&mkp MB5',l:'MB5'}]},
   {id:'app_media',label:'App / Media',wrap:true,keys:APP_MEDIA_KEYS},
@@ -1217,7 +1318,7 @@ const PALETTE_CATS=[
   {id:'consumer_app',label:'Consumer App',wrap:true,keys:kpCodeItems(CONSUMER_APP_KEYCODES)},
   {id:'consumer_input',label:'Input Assist',wrap:true,keys:kpCodeItems(CONSUMER_INPUT_ASSIST_KEYCODES)},
 ];
-const DEFAULT_BINDING_CAT_IDS=['basic','layer','quantum','fn','mouse','app_media','bt','td_pal','macro_pal','dyn','custom','numpad_extra','system_keys','kbd_extra','kbd_app','intl_keys','consumer_keys','consumer_action','consumer_app','consumer_input'];
+const DEFAULT_BINDING_CAT_IDS=['basic','layer','quantum','modtap2','fn','mouse','app_media','bt','td_pal','macro_pal','dyn','custom','numpad_extra','system_keys','kbd_extra','kbd_app','intl_keys','consumer_keys','consumer_action','consumer_app','consumer_input'];
 const KEYCODE_CONTEXT_CAT_IDS=['basic','fn','numpad_extra'];
 
 // パレット定義から raw → label の逆引きマップを構築
@@ -1268,8 +1369,9 @@ const TP_SCHEMA=[
     {key:'CONFIG_INPUT_IQS9151_2F_TAP_MOVE',label:'Tap Move Limit',type:'num',desc:'2本指タップ中に許容される最大移動量。これを超えるとスクロール開始と判定されます。'},
     {key:'CONFIG_INPUT_IQS9151_2F_PRESSHOLD_ENABLE',label:'Press Hold Enable',type:'bool',desc:'2本指長押しを認識する機能の有効/無効。'},
     {key:'CONFIG_INPUT_IQS9151_SCROLL_Y_ENABLE',label:'Vertical Scroll',type:'bool',desc:'2本指の上下スワイプで縦スクロールを行う機能の有効/無効。'},
-    {key:'CONFIG_INPUT_IQS9151_SCROLL_X_ENABLE',label:'Horizontal Scroll',type:'bool',desc:'2本指の左右スワイプで横スクロールを行う機能の有効/無効。'},
+    {key:'_2F_HORIZONTAL_ACTION',label:'Horizontal Swipe',type:'swipeMode',desc:'2本指の左右スワイプを横スクロールとして送るか、Trackpad上部の横スワイプ右/左に割り当てた戻る/進むとして送るかを選びます。'},
     {key:'CONFIG_INPUT_IQS9151_2F_SCROLL_START_MOVE',label:'Scroll Start Move',type:'num',desc:'スクロールと認識される最小移動量。小さいほど少し動かすだけでスクロールが始まります。大きくすると誤スクロールを防げます。'},
+    {key:'CONFIG_INPUT_IQS9151_2F_NAV_SWIPE_THRESHOLD',label:'Back/Forward Threshold',type:'num',min:1,max:2000,desc:'戻る/進むとして認識される左右スワイプ量のしきい値。Horizontal Swipe が Back / Forward のときに使われます。'},
   ]},
   {title:'Scroll Inertia',rows:[
     {key:'CONFIG_INPUT_IQS9151_SCROLL_INERTIA_ENABLE',label:'Enable',type:'bool',desc:'スクロール慣性機能の有効/無効。有効にすると指を離した後もスクロールが滑らかに減速しながら続きます。'},
@@ -1330,6 +1432,8 @@ const state={
   activePalCat:'basic',unsaved:false,editIdx:-1,
   currentTab:'keymap',
   paletteContext:null,
+  baselineLayers:[],
+  device:{conn:null,transport:null,label:'',mode:'',keymap:null,realtime:false},
 };
 
 // 笏笏 API / Status 笏笏
@@ -1339,6 +1443,7 @@ async function api(url,method='GET',body=null){
   return (await fetch(url,o)).json();
 }
 function setStatus(msg,cls=''){ const el=document.getElementById('status-msg'); el.textContent=msg; el.className=cls; }
+function deepClone(obj){ return JSON.parse(JSON.stringify(obj)); }
 function saveSuccessMessage(tdModuleStatus){
   if(tdModuleStatus==='installed') return 'Saved all changes. TD module was installed automatically.';
   if(tdModuleStatus==='already_present') return 'Saved all changes. TD module is already available.';
@@ -1352,14 +1457,36 @@ function emptyMacroDefs(){ return Array.from({length:MACRO_COUNT},(_,i)=>macroEm
 function applySettingsMeta(settings={}){
   state.settingsMeta={
     firmware_folder:settings.firmware_folder||'',
+    firmware_build_command:settings.firmware_build_command||'',
+    firmware_build_cwd:settings.firmware_build_cwd||'',
+    firmware_uf2_path:settings.firmware_uf2_path||'',
+    firmware_flash_target:settings.firmware_flash_target||'',
     per_folder_macros:settings.per_folder_macros||{},
   };
+  syncFirmwareSettingsControls();
   syncMacroRestoreControls();
 }
 async function refreshSettingsMeta(){
   const s=await api('/api/settings');
   applySettingsMeta(s);
   return s;
+}
+function syncFirmwareSettingsControls(){
+  const meta=state.settingsMeta||{};
+  const setVal=(id,value)=>{ const el=document.getElementById(id); if(el) el.value=value||''; };
+  setVal('fw-build-command',meta.firmware_build_command);
+  setVal('fw-build-cwd',meta.firmware_build_cwd);
+  setVal('fw-uf2-path',meta.firmware_uf2_path);
+  setVal('fw-flash-target',meta.firmware_flash_target);
+}
+function firmwareSettingsFromControls(){
+  const getVal=id=>(document.getElementById(id)?.value||'').trim();
+  return {
+    firmware_build_command:getVal('fw-build-command'),
+    firmware_build_cwd:getVal('fw-build-cwd'),
+    firmware_uf2_path:getVal('fw-uf2-path'),
+    firmware_flash_target:getVal('fw-flash-target'),
+  };
 }
 function countConfiguredMacros(macros){
   return (macros||[]).filter(m=>Array.isArray(m?.steps)&&m.steps.length).length;
@@ -1407,7 +1534,11 @@ function bindHoverCode(el, raw){
   el.addEventListener('mouseenter',()=>setHoverCode(raw||''));
   el.addEventListener('mouseleave',()=>setHoverCode(''));
 }
-function markUnsaved(){ state.unsaved=true; document.getElementById('unsaved-dot').classList.remove('d-none'); }
+function markUnsaved(){
+  state.unsaved=true;
+  document.getElementById('unsaved-dot').classList.remove('d-none');
+  scheduleRealtimeDeviceWrite();
+}
 function markSaved(){ state.unsaved=false; document.getElementById('unsaved-dot').classList.add('d-none'); }
 function needsFollowUpPicker(raw){ return !!raw && raw.includes(MOD_PH); }
 function isModifierKeycode(name){
@@ -1555,30 +1686,42 @@ function validateTdDefsBeforeSave(){
 }
 
 // 笏笏 蜈ｨ菴謎ｿ晏ｭ・笏笏
-async function saveAll(){
-  if(!validateTdDefsBeforeSave()) return;
-  setStatus('Saving...');
+async function saveAll(opts={}){
+  const {quiet=false,skipRealtime=false}=opts;
+  if(!validateTdDefsBeforeSave()) return false;
+  if(!quiet) setStatus('Saving...');
   try {
     await api('/api/settings','POST',{td_definitions:state.tdDefs, macro_definitions:state.macroDefs});
     let tdModuleStatus='not_needed';
     if(state.layers.length){
       const r=await api('/api/keymap','POST',{layers:state.layers, combos:state.combos, td_definitions:state.tdDefs, conditional_layers:state.conditionalLayers, macro_definitions:state.macroDefs});
-      if(r.error){ setStatus(r.error,'s-err'); return; }
+      if(r.error){ setStatus(r.error,'s-err'); return false; }
       tdModuleStatus=r.td_module||tdModuleStatus;
     }
     for(const side of ['left','right']){
       if(Object.keys(state.tpConfigs[side]).length){
         const r=await api(`/api/config/${side}`,'POST',{config:state.tpConfigs[side]});
-        if(r.error){ setStatus(`Trackpad (${side}) save error: `+r.error,'s-err'); return; }
+        if(r.error){ setStatus(`Trackpad (${side}) save error: `+r.error,'s-err'); return false; }
       }
     }
     if(Object.keys(state.mainConfig).length){
       const r=await api('/api/config/main','POST',{config:state.mainConfig});
-      if(r.error){ setStatus('General config save error: '+r.error,'s-err'); return; }
+      if(r.error){ setStatus('General config save error: '+r.error,'s-err'); return false; }
     }
     await refreshSettingsMeta();
-    markSaved(); setStatus(saveSuccessMessage(tdModuleStatus),'s-ok');
-  } catch(e){ setStatus('Save error: '+e.message,'s-err'); }
+    if(!skipRealtime && state.device.realtime && state.device.conn){
+      const deviceResult=await applyKeymapToDevice({quiet:true});
+      if(deviceResult.error){ setStatus(`Saved files, MCU write error: ${deviceResult.error}`,'s-warn'); return false; }
+      if(deviceResult.unsupportedCount>0){
+        setStatus(`Saved files. MCU wrote ${deviceResult.changedCount} keys; ${deviceResult.unsupportedCount} bindings need firmware rebuild/ZMK Studio support.`,'s-warn');
+        markSaved();
+        return true;
+      }
+    }
+    markSaved();
+    if(!quiet) setStatus(saveSuccessMessage(tdModuleStatus),'s-ok');
+    return true;
+  } catch(e){ setStatus('Save error: '+e.message,'s-err'); return false; }
 }
 
 // 笏笏 險ｭ螳壹Δ繝ｼ繝繝ｫ 笏笏
@@ -1669,6 +1812,7 @@ async function loadKeymap(){
   const data=await api('/api/keymap');
   if(data.error){ setStatus(data.error,'s-err'); document.getElementById('file-status').textContent=data.error; return; }
   state.layers=data.layers; state.currentLayer=0;
+  state.baselineLayers=deepClone(data.layers||[]);
   state.combos=data.combos||[];
   state.conditionalLayers=data.conditional_layers||[];
   state.tdDefs=data.td_definitions||state.tdDefs;
@@ -2670,10 +2814,32 @@ function copyTpGestureBindings(fromSide,toSide){
 }
 function getRotation(cfg){ if(cfg['CONFIG_INPUT_IQS9151_ROTATE_90']==='y') return 90; if(cfg['CONFIG_INPUT_IQS9151_ROTATE_180']==='y') return 180; if(cfg['CONFIG_INPUT_IQS9151_ROTATE_270']==='y') return 270; return 0; }
 function setRotation(cfg,deg,schema,cid){ ['0','90','180','270'].forEach(d=>cfg[`CONFIG_INPUT_IQS9151_ROTATE_${d}`]=(+d===deg?'y':'n')); markUnsaved(); renderSettingsGrid(schema,cfg,cid); }
+function getTwoFingerHorizontalAction(cfg){
+  return cfg['CONFIG_INPUT_IQS9151_2F_HORIZONTAL_NAV']==='y' ? 'nav' : 'scroll';
+}
+function setTwoFingerHorizontalAction(cfg,mode){
+  if(mode==='nav'){
+    cfg['CONFIG_INPUT_IQS9151_2F_HORIZONTAL_NAV']='y';
+    cfg['CONFIG_INPUT_IQS9151_SCROLL_X_ENABLE']='n';
+  }else{
+    cfg['CONFIG_INPUT_IQS9151_2F_HORIZONTAL_NAV']='n';
+    cfg['CONFIG_INPUT_IQS9151_SCROLL_X_ENABLE']='y';
+  }
+  if(!cfg['CONFIG_INPUT_IQS9151_2F_NAV_SWIPE_THRESHOLD']){
+    cfg['CONFIG_INPUT_IQS9151_2F_NAV_SWIPE_THRESHOLD']='200';
+  }
+  markUnsaved();
+}
 function copyTpSection(sect){
   const other=state.tpSide==='left'?'right':'left';
   const src=state.tpConfigs[state.tpSide],dst=state.tpConfigs[other];
-  sect.rows.forEach(row=>{ if(row.type==='rotate'){ ['0','90','180','270'].forEach(d=>{ const k=`CONFIG_INPUT_IQS9151_ROTATE_${d}`; if(k in src) dst[k]=src[k]; }); } else if(row.key&&row.key in src) dst[row.key]=src[row.key]; });
+  sect.rows.forEach(row=>{
+    if(row.type==='rotate'){
+      ['0','90','180','270'].forEach(d=>{ const k=`CONFIG_INPUT_IQS9151_ROTATE_${d}`; if(k in src) dst[k]=src[k]; });
+    }else if(row.type==='swipeMode'){
+      ['CONFIG_INPUT_IQS9151_2F_HORIZONTAL_NAV','CONFIG_INPUT_IQS9151_SCROLL_X_ENABLE'].forEach(k=>{ if(k in src) dst[k]=src[k]; });
+    }else if(row.key&&row.key in src) dst[row.key]=src[row.key];
+  });
   markUnsaved();
   setStatus(`Copied "${sect.title}" to ${other}`,'s-ok');
 }
@@ -2692,6 +2858,7 @@ function renderSettingsGrid(schema,cfgObj,cid){
       if(row.type==='bool'){ const lw=document.createElement('label'); lw.className='toggle'; const inp=document.createElement('input'); inp.type='checkbox'; inp.checked=cfgObj[row.key]==='y'; inp.onchange=()=>{ cfgObj[row.key]=inp.checked?'y':'n'; markUnsaved(); }; const sl=document.createElement('span'); sl.className='tsl'; lw.appendChild(inp); lw.appendChild(sl); r.appendChild(lw); }
       else if(row.type==='num'){ const inp=document.createElement('input'); inp.type='number'; inp.className='snum'; inp.value=cfgObj[row.key]||''; if(row.min!==undefined) inp.min=row.min; if(row.max!==undefined) inp.max=row.max; inp.oninput=()=>{ cfgObj[row.key]=inp.value; markUnsaved(); }; r.appendChild(inp); }
       else if(row.type==='rotate'){ const grp=document.createElement('div'); grp.className='rot-grp'; const cur=getRotation(cfgObj); [0,90,180,270].forEach(deg=>{ const b=document.createElement('button'); b.className='rot-btn'+(cur===deg?' active':''); b.textContent=deg+'°'; b.onclick=()=>setRotation(cfgObj,deg,schema,cid); grp.appendChild(b); }); r.appendChild(grp); }
+      else if(row.type==='swipeMode'){ const sel=document.createElement('select'); sel.className='sselect'; [{value:'scroll',label:'Horizontal Scroll'},{value:'nav',label:'Back / Forward'}].forEach(opt=>{ const o=document.createElement('option'); o.value=opt.value; o.textContent=opt.label; sel.appendChild(o); }); sel.value=getTwoFingerHorizontalAction(cfgObj); sel.onchange=()=>{ setTwoFingerHorizontalAction(cfgObj,sel.value); renderSettingsGrid(schema,cfgObj,cid); }; r.appendChild(sel); }
       div.appendChild(r);
     });
     container.appendChild(div);
@@ -3482,6 +3649,572 @@ function renderMacroTab(){
   renderPalette();
 }
 
+// ---- MCU write via ZMK Studio RPC ----
+function deviceLog(message){
+  const el=document.getElementById('device-log');
+  if(!el) return;
+  const ts=new Date().toLocaleTimeString();
+  el.textContent+=`[${ts}] ${message}\n`;
+  el.scrollTop=el.scrollHeight;
+}
+function setDeviceStatus(message, cls=''){
+  const el=document.getElementById('device-status');
+  if(el){ el.textContent=message; el.className='device-status '+cls; }
+}
+function setUsbDiag(message, cls=''){
+  const el=document.getElementById('device-usb-diag');
+  if(el){ el.textContent=message; el.className='device-diag '+cls; }
+}
+function usbSupportReport(){
+  const lines=[];
+  const href=location.href;
+  const secure=!!window.isSecureContext;
+  const hasSerial=!!navigator.serial?.requestPort;
+  const activation=navigator.userActivation
+    ? `active=${navigator.userActivation.isActive}, hasBeenActive=${navigator.userActivation.hasBeenActive}`
+    : 'unavailable';
+  lines.push(`URL: ${href}`);
+  lines.push(`Secure context: ${secure ? 'yes' : 'no'}`);
+  lines.push(`Web Serial API: ${hasSerial ? 'available' : 'not available'}`);
+  lines.push(`User activation: ${activation}`);
+  lines.push(`Browser: ${navigator.userAgent}`);
+  return {secure,hasSerial,lines};
+}
+function refreshUsbDiag(){
+  const report=usbSupportReport();
+  let cls='ok';
+  let msg=report.lines.join('\n');
+  if(!report.secure){
+    cls='err';
+    msg+='\n\nOpen from http://localhost:5173. Web Serial is blocked on ordinary file/http pages.';
+  }else if(!report.hasSerial){
+    cls='err';
+    msg+='\n\nWeb Serial is unavailable here. Open this editor in desktop Chrome or Microsoft Edge, not Firefox/Safari or an embedded app browser.';
+  }else{
+    msg+='\n\nUSB serial selection is available. Press Connect USB or Test USB Dialog.';
+  }
+  setUsbDiag(msg,cls);
+  return report;
+}
+function updateDevicePanel(){
+  const transport=document.getElementById('device-transport');
+  const label=document.getElementById('device-label');
+  const rt=document.getElementById('device-realtime');
+  if(transport) transport.textContent=state.device.mode||'-';
+  if(label) label.textContent=state.device.label||'-';
+  if(rt) rt.checked=!!state.device.realtime;
+  refreshUsbDiag();
+}
+function setDeviceRealtime(value){
+  state.device.realtime=!!value;
+  deviceLog(`Realtime keymap write: ${state.device.realtime?'on':'off'}`);
+  if(state.device.realtime) scheduleRealtimeDeviceWrite();
+}
+function scheduleRealtimeDeviceWrite(){
+  clearTimeout(window.__deviceRealtimeTimer);
+  if(!state.device?.realtime||!state.device?.conn||!state.layers?.length) return;
+  window.__deviceRealtimeTimer=setTimeout(async()=>{
+    const result=await applyKeymapToDevice({quiet:true});
+    if(result.error){
+      setDeviceStatus('Realtime write failed','err');
+      deviceLog('Realtime write error: '+result.error);
+      return;
+    }
+    if(result.changedCount||result.unsupportedCount){
+      setDeviceStatus('Connected','ok');
+      deviceLog(`Realtime wrote ${result.changedCount} keys${result.unsupportedCount?`, unsupported ${result.unsupportedCount}`:''}.`);
+    }
+  },900);
+}
+async function loadZmkStudioClient(){
+  if(window.__zmkStudioClient) return window.__zmkStudioClient;
+  const base='https://esm.sh/@zmkfirmware/zmk-studio-ts-client@0.0.18';
+  const [core,serial,gatt]=await Promise.all([
+    import(base+'?bundle'),
+    import(base+'/transport/serial?bundle'),
+    import(base+'/transport/gatt?bundle'),
+  ]);
+  window.__zmkStudioClient={core,serial,gatt};
+  return window.__zmkStudioClient;
+}
+async function callDeviceRpc(req, timeoutMs=5000){
+  const zmk=await loadZmkStudioClient();
+  const timeout=new Promise((_resolve,reject)=>{
+    setTimeout(()=>reject(new Error('MCU RPC timed out. Check Studio unlock/output endpoint and reconnect.')),timeoutMs);
+  });
+  return Promise.race([zmk.core.call_rpc(state.device.conn,req),timeout]);
+}
+async function requestUsbSerialTransport(){
+  const report=refreshUsbDiag();
+  if(!report.secure){
+    throw new Error('Web Serial requires a secure context. Open this editor from http://localhost:5173.');
+  }
+  if(!report.hasSerial){
+    throw new Error('This browser does not support Web Serial. Use Chrome or Microsoft Edge.');
+  }
+  if(navigator.userActivation && !navigator.userActivation.isActive){
+    throw new Error('USB selection was blocked because the browser did not treat this as a direct button click. Press Connect USB or Test USB Dialog once more.');
+  }
+  const abortController=new AbortController();
+  deviceLog('Opening browser USB serial picker...');
+  const port=await navigator.serial.requestPort({});
+  try{
+    await port.open({baudRate:12500});
+  }catch(e){
+    if(e instanceof DOMException && e.name==='NetworkError'){
+      throw new Error('Failed to open the serial port. Close other serial/terminal apps and try again.');
+    }
+    throw e;
+  }
+  const info=port.getInfo?.()||{};
+  const label=[info.usbVendorId,info.usbProductId].filter(v=>v!==undefined).join(':')||'USB serial device';
+  const closePort=async()=>{
+    abortController.signal.removeEventListener('abort',closePort);
+    try{ await port.writable?.close(); }catch(_e){}
+    try{ await port.readable?.cancel(); }catch(_e){}
+    try{ await port.close(); }catch(_e){}
+  };
+  abortController.signal.addEventListener('abort',closePort);
+  return {label,abortController,readable:port.readable,writable:port.writable};
+}
+async function testUsbSerialDialog(){
+  try{
+    setDeviceStatus('Testing USB dialog...','warn');
+    const transport=await requestUsbSerialTransport();
+    const label=transport.label||'USB serial device';
+    deviceLog(`USB dialog opened and selected: ${label}`);
+    setDeviceStatus('USB dialog OK','ok');
+    transport.abortController.abort('dialog test complete');
+  }catch(e){
+    const msg=e?.message||String(e);
+    setDeviceStatus('USB dialog failed','err');
+    deviceLog('USB dialog test failed: '+msg);
+    setStatus('USB dialog error: '+msg,'s-err');
+    refreshUsbDiag();
+  }
+}
+async function connectDevice(mode){
+  try{
+    setDeviceStatus('Connecting...','warn');
+    deviceLog(`Connecting via ${mode.toUpperCase()}...`);
+    const transport=mode==='usb' ? await requestUsbSerialTransport() : null;
+    const zmk=await loadZmkStudioClient();
+    const activeTransport=transport || await zmk.gatt.connect();
+    const conn=zmk.core.create_rpc_connection(activeTransport,{signal:activeTransport.abortController.signal});
+    state.device={...state.device,conn,transport:activeTransport,label:activeTransport.label||'',mode:mode.toUpperCase(),keymap:null,behaviors:null};
+    const info=await callDeviceRpc({core:{getDeviceInfo:true}});
+    const keymapResp=await callDeviceRpc({keymap:{getKeymap:true}});
+    const name=info.core?.getDeviceInfo?.name||activeTransport.label||'ZMK device';
+    state.device={...state.device,label:name,keymap:keymapResp.keymap?.getKeymap||null};
+    setDeviceStatus('Connected','ok');
+    updateDevicePanel();
+    deviceLog(`Connected: ${name}`);
+    deviceLog('Device keymap loaded. Use Write current keymap to push changed layer bindings.');
+    return true;
+  }catch(e){
+    const msg=e?.message||String(e);
+    setDeviceStatus('Connection failed','err');
+    deviceLog(`Connection failed: ${msg}`);
+    setStatus('MCU connection error: '+msg,'s-err');
+    return false;
+  }
+}
+function disconnectDevice(){
+  try{ state.device.transport?.abortController?.abort('user disconnect'); }catch(_e){}
+  state.device={conn:null,transport:null,label:'',mode:'',keymap:null,realtime:state.device.realtime};
+  setDeviceStatus('Disconnected');
+  updateDevicePanel();
+  deviceLog('Disconnected.');
+}
+function bindingKey(binding){
+  if(!binding) return '';
+  return [binding.behaviorId??'',binding.param1??'',binding.param2??''].join(':');
+}
+function normalizeBehaviorLabel(label){
+  return (label||'').trim().replace(/^&/,'');
+}
+const DEVICE_BEHAVIOR_LABEL_ALIASES={
+  'Key press':'kp',
+  'Key Press':'kp',
+  'Keypress':'kp',
+  'Transparent':'trans',
+  'None':'none',
+  'Momentary Layer':'mo',
+  'To Layer':'to',
+  'Layer Tap':'lt',
+  'Mod Tap':'mt',
+  'mod_tap2':'mt2',
+  'Mod Tap2':'mt2',
+  'ModTap2':'mt2',
+  'Toggle Layer':'tog',
+};
+function aliasForDeviceBehavior(details){
+  const name=(details?.displayName||'').trim();
+  if(DEVICE_BEHAVIOR_LABEL_ALIASES[name]) return DEVICE_BEHAVIOR_LABEL_ALIASES[name];
+  const lower=name.toLowerCase().replace(/[\s_-]+/g,'');
+  if(lower==='keypress'||lower==='key') return 'kp';
+  if(lower==='transparent') return 'trans';
+  if(lower==='none'||lower==='nooutput') return 'none';
+  if(lower==='momentarylayer') return 'mo';
+  if(lower==='tolayer') return 'to';
+  if(lower==='togglelayer') return 'tog';
+  if(lower==='mt2'||lower==='modtap2') return 'mt2';
+  if((details?.metadata||[]).some(set=>(set.param1||[]).some(param=>param.hidUsage))){
+    return 'kp';
+  }
+  return '';
+}
+function parseRawBinding(raw){
+  const text=(raw||'').trim();
+  if(!text.startsWith('&')) return null;
+  const parts=text.slice(1).split(/\s+/).filter(Boolean);
+  if(!parts.length) return null;
+  return {label:normalizeBehaviorLabel(parts[0]),params:parts.slice(1),raw:text};
+}
+const HID_KEYBOARD_PAGE=0x00070000;
+const DEVICE_WRITE_CONVERTER_VERSION='2026-05-11-mt2-rpc-1';
+const HID_KEYBOARD_USAGE={
+  A:0x04,B:0x05,C:0x06,D:0x07,E:0x08,F:0x09,G:0x0a,H:0x0b,I:0x0c,J:0x0d,K:0x0e,L:0x0f,M:0x10,
+  N:0x11,O:0x12,P:0x13,Q:0x14,R:0x15,S:0x16,T:0x17,U:0x18,V:0x19,W:0x1a,X:0x1b,Y:0x1c,Z:0x1d,
+  NUMBER_1:0x1e,NUMBER_2:0x1f,NUMBER_3:0x20,NUMBER_4:0x21,NUMBER_5:0x22,NUMBER_6:0x23,NUMBER_7:0x24,NUMBER_8:0x25,NUMBER_9:0x26,NUMBER_0:0x27,
+  N1:0x1e,N2:0x1f,N3:0x20,N4:0x21,N5:0x22,N6:0x23,N7:0x24,N8:0x25,N9:0x26,N0:0x27,
+  ENTER:0x28,RET:0x28,RETURN:0x28,ESCAPE:0x29,ESC:0x29,BACKSPACE:0x2a,BSPC:0x2a,TAB:0x2b,SPACE:0x2c,
+  MINUS:0x2d,EQUAL:0x2e,LEFT_BRACKET:0x2f,RIGHT_BRACKET:0x30,BACKSLASH:0x31,NON_US_HASH:0x32,
+  SEMI:0x33,SEMICOLON:0x33,SQT:0x34,APOSTROPHE:0x34,GRAVE:0x35,COMMA:0x36,PERIOD:0x37,SLASH:0x38,
+  CAPS:0x39,CAPSLOCK:0x39,CAPS_LOCK:0x39,
+  F1:0x3a,F2:0x3b,F3:0x3c,F4:0x3d,F5:0x3e,F6:0x3f,F7:0x40,F8:0x41,F9:0x42,F10:0x43,F11:0x44,F12:0x45,
+  PRINTSCREEN:0x46,SCROLLLOCK:0x47,PAUSE_BREAK:0x48,PAUSE:0x48,INSERT:0x49,HOME:0x4a,PAGE_UP:0x4b,DELETE:0x4c,END:0x4d,PAGE_DOWN:0x4e,
+  RIGHT:0x4f,LEFT:0x50,DOWN:0x51,UP:0x52,
+  KP_NUMLOCK:0x53,KP_DIVIDE:0x54,KP_ASTERISK:0x55,KP_MINUS:0x56,KP_PLUS:0x57,KP_ENTER:0x58,
+  KP_NUMBER_1:0x59,KP_NUMBER_2:0x5a,KP_NUMBER_3:0x5b,KP_NUMBER_4:0x5c,KP_NUMBER_5:0x5d,KP_NUMBER_6:0x5e,KP_NUMBER_7:0x5f,KP_NUMBER_8:0x60,KP_NUMBER_9:0x61,KP_NUMBER_0:0x62,KP_DOT:0x63,
+  NON_US_BACKSLASH:0x64,K_APPLICATION:0x65,K_MENU:0x65,K_POWER:0x66,KP_EQUAL:0x67,F13:0x68,F14:0x69,F15:0x6a,F16:0x6b,F17:0x6c,F18:0x6d,F19:0x6e,F20:0x6f,F21:0x70,F22:0x71,F23:0x72,F24:0x73,
+  INTERNATIONAL_1:0x87,INTERNATIONAL_2:0x88,INTERNATIONAL_3:0x89,INTERNATIONAL_4:0x8a,INTERNATIONAL_5:0x8b,LANGUAGE_1:0x90,LANGUAGE_2:0x91,
+  LEFT_CONTROL:0xe0,LEFT_SHIFT:0xe1,LEFT_ALT:0xe2,LEFT_GUI:0xe3,RIGHT_CONTROL:0xe4,RIGHT_SHIFT:0xe5,RIGHT_ALT:0xe6,RIGHT_GUI:0xe7,
+  LCTRL:0xe0,LSHIFT:0xe1,LALT:0xe2,LGUI:0xe3,RCTRL:0xe4,RSHIFT:0xe5,RALT:0xe6,RGUI:0xe7,
+  LWIN:0xe3,RWIN:0xe7,
+};
+function keycodeToHidUsage(token){
+  const key=(token||'').trim().toUpperCase();
+  if(!key) return null;
+  if(Object.prototype.hasOwnProperty.call(HID_KEYBOARD_USAGE,key)) return HID_KEYBOARD_PAGE + HID_KEYBOARD_USAGE[key];
+  return null;
+}
+function hidUsageBase(value){
+  return (Number(value)||0) & 0x00ffffff;
+}
+function hidUsagePage(value){
+  return hidUsageBase(value) >>> 16;
+}
+function isKeyboardOrConsumerUsage(value){
+  const page=hidUsagePage(value);
+  return page===0x07 || page===0x0c;
+}
+function sameHidUsageIgnoringImplicitMods(a,b){
+  return hidUsageBase(a)===hidUsageBase(b);
+}
+async function loadDeviceBehaviors(){
+  if(state.device.behaviors) return state.device.behaviors;
+  const map={};
+  try{
+    const list=await callDeviceRpc({behaviors:{listAllBehaviors:true}},8000);
+    const ids=list.behaviors?.listAllBehaviors?.behaviors||[];
+    for(const behaviorId of ids){
+      const resp=await callDeviceRpc({behaviors:{getBehaviorDetails:{behaviorId}}},4000);
+      const details=resp.behaviors?.getBehaviorDetails;
+      if(details) map[details.id]=details;
+    }
+    state.device.behaviors=map;
+  }catch(e){
+    deviceLog('Behavior list unavailable; falling back to existing-keymap mappings: '+(e?.message||String(e)));
+    state.device.behaviors=map;
+  }
+  return state.device.behaviors;
+}
+function buildRawBindingMap(localLayers, remoteKeymap){
+  const map=new Map();
+  const conflicts=new Set();
+  const behaviorIdsByLabel=new Map();
+  const inferredBehaviorIds=new Map();
+  const addInferredBehaviorId=(label,behaviorId)=>{
+    if(behaviorId===undefined || behaviorId===null) return;
+    const key=normalizeBehaviorLabel(label);
+    if(!key) return;
+    if(!inferredBehaviorIds.has(key)) inferredBehaviorIds.set(key,new Map());
+    const counts=inferredBehaviorIds.get(key);
+    counts.set(behaviorId,(counts.get(behaviorId)||0)+1);
+  };
+  Object.values(state.device.behaviors||{}).forEach(details=>{
+    const alias=aliasForDeviceBehavior(details);
+    if(alias && !behaviorIdsByLabel.has(alias)) behaviorIdsByLabel.set(alias,details.id);
+  });
+  (remoteKeymap?.layers||[]).forEach(layer=>{
+    (layer.bindings||[]).forEach(rb=>{
+      if(!behaviorIdsByLabel.has('kp') && rb && isKeyboardOrConsumerUsage(rb.param1)){
+        behaviorIdsByLabel.set('kp',rb.behaviorId);
+      }
+    });
+  });
+  (localLayers||[]).forEach((layer,li)=>{
+    const remoteLayer=remoteKeymap?.layers?.[li];
+    (layer.bindings||[]).forEach((b,ki)=>{
+      const raw=(b.raw||'').trim();
+      const rb=remoteLayer?.bindings?.[ki];
+      if(!raw||!rb) return;
+      const parsed=parseRawBinding(raw);
+      if(parsed && !behaviorIdsByLabel.has(parsed.label)) behaviorIdsByLabel.set(parsed.label,rb.behaviorId);
+      if(parsed?.label==='kp'){
+        const expected=keycodeToHidUsage(parsed.params[0]);
+        if(expected!==null && sameHidUsageIgnoringImplicitMods(rb.param1,expected)){
+          addInferredBehaviorId('kp',rb.behaviorId);
+        }
+      }
+      const prev=map.get(raw);
+      if(prev&&bindingKey(prev)!==bindingKey(rb)) conflicts.add(raw);
+      else map.set(raw,{...rb});
+    });
+  });
+  inferredBehaviorIds.forEach((counts,label)=>{
+    let bestId;
+    let bestCount=-1;
+    counts.forEach((count,id)=>{
+      if(count>bestCount){ bestId=id; bestCount=count; }
+    });
+    if(bestId!==undefined) behaviorIdsByLabel.set(label,bestId);
+  });
+  conflicts.forEach(raw=>map.delete(raw));
+  return {rawMap:map,behaviorIdsByLabel};
+}
+function layerIndexToDeviceId(remoteKeymap, value){
+  const index=Number(value);
+  if(Number.isInteger(index) && remoteKeymap?.layers?.[index]?.id!==undefined) return remoteKeymap.layers[index].id;
+  return null;
+}
+function bindingFromParsedRaw(parsed, behaviorIdsByLabel, remoteKeymap){
+  if(!parsed) return null;
+  if(parsed.label==='none'||parsed.label==='trans') return {behaviorId,param1:0,param2:0};
+  if(parsed.label==='kp'){
+    const behaviorId=behaviorIdsByLabel.get('kp') ?? inferKeyboardBehaviorIdFromRemote(remoteKeymap);
+    if(behaviorId===undefined) return null;
+    const usage=keycodeToHidUsage(parsed.params[0]);
+    if(usage!==null) return {behaviorId,param1:usage,param2:0};
+    return null;
+  }
+  if(parsed.label==='mt'||parsed.label==='mt2'){
+    const behaviorId=behaviorIdsByLabel.get(parsed.label);
+    if(behaviorId===undefined) return null;
+    const holdUsage=keycodeToHidUsage(parsed.params[0]);
+    const tapUsage=keycodeToHidUsage(parsed.params[1]);
+    if(holdUsage!==null && tapUsage!==null) return {behaviorId,param1:holdUsage,param2:tapUsage};
+    return null;
+  }
+  const behaviorId=behaviorIdsByLabel.get(parsed.label);
+  if(behaviorId===undefined) return null;
+  if(['mo','to','tog'].includes(parsed.label)){
+    const layerId=layerIndexToDeviceId(remoteKeymap, parsed.params[0]);
+    if(layerId!==null) return {behaviorId,param1:layerId,param2:0};
+  }
+  return null;
+}
+function inferKeyboardBehaviorIdFromRemote(remoteKeymap){
+  const counts=new Map();
+  (remoteKeymap?.layers||[]).forEach(layer=>{
+    (layer.bindings||[]).forEach(binding=>{
+      if(binding && isKeyboardOrConsumerUsage(binding.param1)){
+        counts.set(binding.behaviorId,(counts.get(binding.behaviorId)||0)+1);
+      }
+    });
+  });
+  let bestId;
+  let bestCount=-1;
+  counts.forEach((count,id)=>{
+    if(count>bestCount){ bestId=id; bestCount=count; }
+  });
+  return bestId;
+}
+function describeUnsupportedBinding(raw, rawMap){
+  const parsed=parseRawBinding(raw);
+  if(!parsed) return 'not a valid &binding expression';
+  const known=[...rawMap.behaviorIdsByLabel.keys()].sort().join(', ') || '(none)';
+  const behaviorId=parsed.label==='kp'
+    ? (rawMap.behaviorIdsByLabel.get('kp') ?? inferKeyboardBehaviorIdFromRemote(rawMap.remoteKeymap))
+    : rawMap.behaviorIdsByLabel.get(parsed.label);
+  if(behaviorId===undefined) return `behavior "${parsed.label}" is unknown to this device/editor mapping; known labels: ${known}`;
+  if(parsed.label==='kp'){
+    if(!parsed.params[0]) return 'missing keycode after &kp';
+    const usage=keycodeToHidUsage(parsed.params[0]);
+    if(usage===null) return `unknown &kp keycode "${parsed.params[0]}"`;
+    return `&kp parsed as behaviorId=${behaviorId}, HID=0x${usage.toString(16)}, but no RPC binding was produced`;
+  }
+  if(['mo','to','tog'].includes(parsed.label)){
+    const layerId=layerIndexToDeviceId(rawMap.remoteKeymap, parsed.params[0]);
+    if(layerId===null) return `layer index "${parsed.params[0]||''}" is not present on the device`;
+  }
+  if(['mt','mt2'].includes(parsed.label)){
+    if(!parsed.params[0]||!parsed.params[1]) return `missing hold/tap keycode after &${parsed.label}`;
+    if(keycodeToHidUsage(parsed.params[0])===null) return `unknown hold keycode "${parsed.params[0]}"`;
+    if(keycodeToHidUsage(parsed.params[1])===null) return `unknown tap keycode "${parsed.params[1]}"`;
+  }
+  return `behavior "${parsed.label}" exists as id ${behaviorId}, but this editor only converts simple &kp/&mt/&mt2/&mo/&to/&tog/&none/&trans bindings`;
+}
+function formatUnsupportedList(items){
+  return items.slice(0,12).map(x=>`  L${x.layerIndex} K${x.keyPosition}: ${x.raw} (${x.reason||'no diagnostic reason was attached; refresh the editor page and retry'})`).join('\n')+(items.length>12?`\n  ...and ${items.length-12} more`:'');
+}
+function collectLayerBindingChanges(rawMap){
+  const changes=[];
+  const unsupported=[];
+  const baseline=state.baselineLayers||[];
+  state.layers.forEach((layer,li)=>{
+    const baseLayer=baseline[li]||{};
+    (layer.bindings||[]).forEach((binding,ki)=>{
+      const raw=(binding.raw||'').trim();
+      const oldRaw=(baseLayer.bindings?.[ki]?.raw||'').trim();
+      if(raw===oldRaw) return;
+      const remoteBinding=rawMap.rawMap.get(raw) || bindingFromParsedRaw(parseRawBinding(raw), rawMap.behaviorIdsByLabel, rawMap.remoteKeymap);
+      if(remoteBinding) changes.push({layerIndex:li,keyPosition:ki,raw,binding:remoteBinding});
+      else unsupported.push({layerIndex:li,keyPosition:ki,raw,reason:describeUnsupportedBinding(raw,rawMap)});
+    });
+  });
+  return {changes,unsupported};
+}
+async function applyKeymapToDevice({quiet=false}={}){
+  if(!state.device.conn) return {error:'MCU is not connected. Click Write MCU again and select the USB serial device.'};
+  if(!state.layers.length) return {error:'Keymap is not loaded.'};
+  try{
+    const latest=await callDeviceRpc({keymap:{getKeymap:true}},8000);
+    const remoteKeymap=latest.keymap?.getKeymap;
+    if(!remoteKeymap?.layers?.length) return {error:'Device keymap could not be read.'};
+    await loadDeviceBehaviors();
+    const rawMap=buildRawBindingMap(state.baselineLayers,remoteKeymap);
+    rawMap.remoteKeymap=remoteKeymap;
+    const enterParsed=parseRawBinding('&kp ENTER');
+    const enterBinding=bindingFromParsedRaw(enterParsed,rawMap.behaviorIdsByLabel,remoteKeymap);
+    if(!quiet){
+      deviceLog(`Converter ${DEVICE_WRITE_CONVERTER_VERSION}: kpId=${rawMap.behaviorIdsByLabel.get('kp') ?? inferKeyboardBehaviorIdFromRemote(remoteKeymap) ?? 'unknown'}, ENTER=${enterBinding?JSON.stringify(enterBinding):'unsupported'}, known=${[...rawMap.behaviorIdsByLabel.keys()].sort().join(',')||'(none)'}`);
+    }
+    const {changes,unsupported}=collectLayerBindingChanges(rawMap);
+    if(!quiet) deviceLog(`Preparing ${changes.length} changed key bindings. Unsupported: ${unsupported.length}.`);
+    if(!quiet && unsupported.length){
+      deviceLog('Unsupported before write:\n'+formatUnsupportedList(unsupported));
+    }
+    let written=0;
+    for(const change of changes){
+      const layerId=remoteKeymap.layers[change.layerIndex]?.id;
+      if(layerId===undefined){ unsupported.push(change); continue; }
+      const resp=await callDeviceRpc({
+        keymap:{setLayerBinding:{layerId,keyPosition:change.keyPosition,binding:change.binding}}
+      },5000);
+      if(resp.keymap?.setLayerBinding!==0){
+        return {error:`Layer ${change.layerIndex} key ${change.keyPosition} failed (${resp.keymap?.setLayerBinding}).`,changedCount:written,unsupportedCount:unsupported.length};
+      }
+      written++;
+    }
+    const saveResp=await callDeviceRpc({keymap:{saveChanges:true}},8000);
+    if(saveResp.keymap?.saveChanges?.err){
+      return {error:`Device save failed (${saveResp.keymap.saveChanges.err}).`,changedCount:written,unsupportedCount:unsupported.length};
+    }
+    state.device.keymap=remoteKeymap;
+    state.baselineLayers=deepClone(state.layers);
+    if(!quiet){
+      deviceLog(`Wrote ${written} key bindings to MCU and saved changes.`);
+      if(unsupported.length){
+        deviceLog('Unsupported bindings need firmware rebuild or direct ZMK Studio support:\n'+formatUnsupportedList(unsupported));
+      }
+    }
+    return {changedCount:written,unsupportedCount:unsupported.length};
+  }catch(e){
+    return {error:e?.message||String(e)};
+  }
+}
+async function saveFirmwareSettings(){
+  const payload=firmwareSettingsFromControls();
+  const res=await api('/api/settings','POST',payload);
+  if(res.error){
+    setStatus('Firmware settings save error: '+res.error,'s-err');
+    return false;
+  }
+  await refreshSettingsMeta();
+  setStatus('Firmware settings saved.','s-ok');
+  return true;
+}
+async function refreshFirmwareStatus(){
+  try{
+    const res=await api('/api/firmware/status');
+    if(res.error){ setStatus('Firmware status error: '+res.error,'s-err'); return; }
+    const setVal=(id,value)=>{ const el=document.getElementById(id); if(el && !el.value) el.value=value||''; };
+    setVal('fw-build-command',res.build_command);
+    setVal('fw-build-cwd',res.build_cwd);
+    setVal('fw-uf2-path',res.uf2_path || res.uf2_candidates?.[0]?.path || '');
+    setVal('fw-flash-target',res.flash_target || res.flash_targets?.[0] || '');
+    const uf2s=(res.uf2_candidates||[]).map(x=>`UF2: ${x.path}`).join('\n');
+    const drives=(res.flash_targets||[]).join(', ');
+    deviceLog(`Firmware paths refreshed.${uf2s?'\n'+uf2s:''}${drives?'\nTargets: '+drives:''}`);
+    setStatus('Firmware paths refreshed.','s-ok');
+  }catch(e){
+    setStatus('Firmware status error: '+(e?.message||String(e)),'s-err');
+  }
+}
+async function buildFirmwareNow(){
+  setStatus('Saving files before firmware build...');
+  const saved=await saveAll({quiet:true,skipRealtime:true});
+  if(!saved) return false;
+  const payload=firmwareSettingsFromControls();
+  deviceLog('Starting firmware build...');
+  setStatus('Building firmware...');
+  const res=await api('/api/firmware/build','POST',payload);
+  if(res.output) deviceLog(res.output);
+  if(res.uf2_path){
+    const el=document.getElementById('fw-uf2-path');
+    if(el) el.value=res.uf2_path;
+  }
+  if(res.error || !res.ok){
+    setStatus(res.error||'Firmware build failed.','s-err');
+    return false;
+  }
+  await refreshSettingsMeta();
+  setStatus('Firmware build complete.','s-ok');
+  deviceLog('Firmware build complete.');
+  return true;
+}
+async function flashFirmwareNow(){
+  const payload=firmwareSettingsFromControls();
+  setStatus('Copying UF2 to bootloader drive...');
+  const res=await api('/api/firmware/flash','POST',payload);
+  if(res.error){
+    setStatus('UF2 flash error: '+res.error,'s-err');
+    deviceLog('UF2 flash error: '+res.error);
+    return false;
+  }
+  await refreshSettingsMeta();
+  setStatus('UF2 copied to MCU bootloader drive.','s-ok');
+  deviceLog('UF2 copied: '+res.dest);
+  return true;
+}
+async function writeFullFirmwareNow(){
+  const built=await buildFirmwareNow();
+  if(!built) return;
+  await flashFirmwareNow();
+}
+async function writeDeviceNow(){
+  if(!state.device.conn){
+    setStatus('Connecting to MCU over USB...');
+    deviceLog('No active MCU connection. Opening USB serial picker before writing...');
+    const connected=await connectDevice('usb');
+    if(!connected) return;
+  }
+  setStatus('Writing keymap to MCU...');
+  const result=await applyKeymapToDevice();
+  if(result.error){
+    setStatus('MCU write error: '+result.error,'s-err');
+    deviceLog('Write error: '+result.error);
+    return;
+  }
+  if(result.unsupportedCount>0){
+    setStatus(`MCU wrote ${result.changedCount} keys; ${result.unsupportedCount} items require firmware rebuild. See Device log for details.`, 's-warn');
+  }else{
+    setStatus(`MCU write complete (${result.changedCount} keys).`,'s-ok');
+  }
+}
+
 document.addEventListener('keydown',e=>{
   if(e.ctrlKey&&e.key==='s'){ e.preventDefault(); saveAll(); }
   if(e.key==='Escape'){ closeKeyEdit(); closeSettings(); closeMtEdit(); closeKeyPicker(); closeBindingPicker(); closeComboKbPicker(); }
@@ -3499,6 +4232,7 @@ async function init(){
   const r=await api('/api/keymap');
   if(!r.error){
     state.layers=r.layers; state.currentLayer=0;
+    state.baselineLayers=deepClone(r.layers||[]);
     state.combos=r.combos||[];
     state.conditionalLayers=r.conditional_layers||[];
     state.tdDefs=r.td_definitions||state.tdDefs;
@@ -3511,6 +4245,7 @@ async function init(){
     renderLayerBtns(); renderKeyboard(); renderPalette(); renderTpGestureKeys(); renderModTapTab(); renderComboTab(); renderConditionalTab(); renderMacroTab(); markSaved();
     setStatus('Loaded','s-ok');
   } else { setStatus('Open settings and choose the firmware folder first.','s-warn'); }
+  updateDevicePanel();
   ['left','right','main'].forEach(side=>loadConfig(side).catch(()=>{}));
 }
 init();

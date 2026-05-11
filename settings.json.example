@@ -4,6 +4,10 @@
   "main_conf_path": "",
   "left_conf_path": "",
   "right_conf_path": "",
+  "firmware_build_command": "",
+  "firmware_build_cwd": "",
+  "firmware_uf2_path": "",
+  "firmware_flash_target": "",
   "td_definitions": [],
   "macro_definitions": [],
   "keyboard_name": "lalapadgen2"

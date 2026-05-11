@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify
-import json, os, re, subprocess, tempfile, tkinter as tk
+import json, os, re, shutil, subprocess, tempfile, tkinter as tk
 from tkinter import filedialog
 
 app = Flask(__name__)
@@ -137,6 +137,10 @@ def make_default_settings():
         'main_conf_path': '',
         'left_conf_path': '',
         'right_conf_path': '',
+        'firmware_build_command': '',
+        'firmware_build_cwd': '',
+        'firmware_uf2_path': '',
+        'firmware_flash_target': '',
         'td_definitions': [dict(_TD_EMPTY) for _ in range(TD_COUNT)],
         'macro_definitions': make_default_macro_definitions(),
         'per_folder_macros': {},
@@ -526,6 +530,144 @@ def discover_files(folder):
             break
 
     return result
+
+
+# ──────────────────────────────────────────────
+# Firmware build / UF2 flashing
+# ──────────────────────────────────────────────
+
+def _format_firmware_setting(value, settings):
+    firmware_folder = norm(settings.get('firmware_folder', ''))
+    return str(value or '').format(
+        firmware_folder=firmware_folder,
+        config_dir=os.path.join(firmware_folder, 'config') if firmware_folder else '',
+    )
+
+
+def _find_recent_uf2_candidates(settings, limit=8):
+    roots = []
+    firmware_folder = norm(settings.get('firmware_folder', ''))
+    if firmware_folder:
+        roots.extend([
+            os.path.join(firmware_folder, 'build'),
+            os.path.dirname(firmware_folder),
+        ])
+    candidates = []
+    seen = set()
+    for root in roots:
+        if not root or not os.path.isdir(root):
+            continue
+        for dirpath, _, filenames in os.walk(root):
+            for filename in filenames:
+                if not filename.lower().endswith('.uf2'):
+                    continue
+                path = os.path.join(dirpath, filename)
+                if path in seen:
+                    continue
+                seen.add(path)
+                try:
+                    candidates.append({
+                        'path': path,
+                        'mtime': os.path.getmtime(path),
+                        'size': os.path.getsize(path),
+                    })
+                except OSError:
+                    pass
+    candidates.sort(key=lambda item: item['mtime'], reverse=True)
+    return candidates[:limit]
+
+
+def _list_flash_targets():
+    targets = []
+    for letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ':
+        root = f'{letter}:\\'
+        if os.path.isdir(root):
+            targets.append(root)
+    return targets
+
+
+@app.route('/api/firmware/status', methods=['GET'])
+def api_firmware_status():
+    s = load_settings()
+    return jsonify({
+        'build_command': s.get('firmware_build_command', ''),
+        'build_cwd': s.get('firmware_build_cwd', ''),
+        'uf2_path': s.get('firmware_uf2_path', ''),
+        'flash_target': s.get('firmware_flash_target', ''),
+        'uf2_candidates': _find_recent_uf2_candidates(s),
+        'flash_targets': _list_flash_targets(),
+    })
+
+
+@app.route('/api/firmware/build', methods=['POST'])
+def api_firmware_build():
+    payload = request.json or {}
+    s = load_settings()
+    for key in ('firmware_build_command', 'firmware_build_cwd', 'firmware_uf2_path', 'firmware_flash_target'):
+        if key in payload:
+            s[key] = str(payload.get(key) or '').strip()
+    save_settings_file(s)
+
+    command = _format_firmware_setting(s.get('firmware_build_command', ''), s).strip()
+    if not command:
+        return jsonify({'error': 'ビルドコマンドが未設定です。Device タブで firmware build command を設定してください。'}), 400
+    cwd = norm(_format_firmware_setting(s.get('firmware_build_cwd', ''), s).strip() or s.get('firmware_folder', '') or APP_DIR)
+    if not os.path.isdir(cwd):
+        return jsonify({'error': f'ビルド作業フォルダが見つかりません: {cwd}'}), 400
+
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=900,
+        )
+    except subprocess.TimeoutExpired as e:
+        output = ((e.stdout or '') + '\n' + (e.stderr or '')).strip()
+        return jsonify({'error': 'ビルドがタイムアウトしました。', 'output': output}), 500
+    except Exception as e:
+        return jsonify({'error': f'ビルド起動エラー: {e}'}), 500
+
+    candidates = _find_recent_uf2_candidates(s)
+    if candidates and not s.get('firmware_uf2_path'):
+        s['firmware_uf2_path'] = candidates[0]['path']
+        save_settings_file(s)
+
+    output = ((result.stdout or '') + '\n' + (result.stderr or '')).strip()
+    return jsonify({
+        'ok': result.returncode == 0,
+        'returncode': result.returncode,
+        'output': output[-12000:],
+        'uf2_path': s.get('firmware_uf2_path', '') or (candidates[0]['path'] if candidates else ''),
+        'uf2_candidates': candidates,
+        'error': '' if result.returncode == 0 else f'ビルドに失敗しました (exit {result.returncode})',
+    })
+
+
+@app.route('/api/firmware/flash', methods=['POST'])
+def api_firmware_flash():
+    payload = request.json or {}
+    s = load_settings()
+    for key in ('firmware_uf2_path', 'firmware_flash_target'):
+        if key in payload:
+            s[key] = str(payload.get(key) or '').strip()
+    save_settings_file(s)
+
+    uf2_path = norm(_format_firmware_setting(s.get('firmware_uf2_path', ''), s))
+    target_dir = norm(_format_firmware_setting(s.get('firmware_flash_target', ''), s))
+    if not uf2_path or not os.path.isfile(uf2_path):
+        return jsonify({'error': f'UF2 ファイルが見つかりません: {uf2_path or "(未設定)"}'}), 400
+    if not target_dir or not os.path.isdir(target_dir):
+        return jsonify({'error': f'書き込み先ドライブ/フォルダが見つかりません: {target_dir or "(未設定)"}'}), 400
+
+    dest = os.path.join(target_dir, os.path.basename(uf2_path))
+    try:
+        shutil.copyfile(uf2_path, dest)
+    except Exception as e:
+        return jsonify({'error': f'UF2 コピーに失敗しました: {e}'}), 500
+    return jsonify({'ok': True, 'dest': dest})
 
 
 # ──────────────────────────────────────────────
@@ -1289,6 +1431,14 @@ def update_conf(original, new_cfg):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.after_request
+def add_no_cache_headers(response):
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 
 @app.route('/api/settings', methods=['GET', 'POST'])
