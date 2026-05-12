@@ -156,13 +156,20 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
 .sect-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;
   padding-bottom:5px;border-bottom:1px solid var(--bdr);}
 .sect-hdr h3{font-size:10px;color:var(--a2);text-transform:uppercase;letter-spacing:.05em;}
-.srow{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px;}
+.srow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;}
 .srow:last-child{margin-bottom:0;}
-.slabel{font-size:11px;color:var(--dim);flex:1;}
+.slabel{font-size:11px;color:var(--dim);flex:1;display:flex;flex-direction:column;gap:1px;line-height:1.35;}
+.slabel-ja{font-size:10px;color:var(--text);}
 .slabel.has-tip{cursor:help;border-bottom:1px dotted rgba(148,163,184,.45);}
+.write-badge{font-size:9px;line-height:1;border:1px solid var(--bdr2);border-radius:999px;padding:3px 5px;color:var(--muted);background:var(--bg3);flex-shrink:0;}
+.write-badge.fw{border-color:#b45309;color:#fcd34d;background:#3a240b;}
 .snum{width:78px;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);
   padding:3px 5px;border-radius:3px;font-size:11px;text-align:right;}
 .snum:focus{outline:none;border-color:var(--a2);}
+.slider-wrap{display:grid;grid-template-columns:minmax(140px,1fr) 52px;gap:6px;align-items:center;min-width:190px;}
+.srange{width:100%;accent-color:var(--accent);}
+.slider-value{font-variant-numeric:tabular-nums;font-size:11px;color:var(--text);text-align:right;}
+.slider-scale{grid-column:1 / -1;display:flex;justify-content:space-between;font-size:9px;color:var(--muted);line-height:1;}
 .toggle{position:relative;width:32px;height:17px;flex-shrink:0;}
 .toggle input{opacity:0;width:0;height:0;}
 .tsl{position:absolute;inset:0;background:#3b3b3b;border-radius:9px;cursor:pointer;transition:background .2s;}
@@ -1387,6 +1394,10 @@ const MODIFIER_CONTEXT_CATS=[{id:'modifier_keys',label:'Modifiers',type:'quantum
 
 // 笏笏 繝医Λ繝・け繝代ャ繝芽ｨｭ螳壹せ繧ｭ繝ｼ繝・笏笏
 const TP_SCHEMA=[
+  {title:'Cursor Speed',titleJa:'カーソル速度',rows:[
+    {key:'CONFIG_ZMK_INPUT_PROCESSOR_DYNAMIC_SCALER_DEFAULT_SCALE_X10',label:'Cursor Speed',ja:'カーソル速度',type:'slider',min:2,max:50,step:1,default:10,format:'scaleX10',
+      desc:'カーソル移動量の倍率。0.2x が最も遅く、1.0x が標準、5.0x が最も速い設定です。変更後は Save All とファームウェア書き込みが必要です。'},
+  ]},
   {title:'Sensor',rows:[
     {key:'CONFIG_INPUT_IQS9151_RESOLUTION_X',label:'Resolution X',type:'num',min:100,max:4096,desc:'X軸の分解能（100〜4096）。値が高いほど細かい動きを検出します。高すぎるとノイズが増えることがあります。'},
     {key:'CONFIG_INPUT_IQS9151_RESOLUTION_Y',label:'Resolution Y',type:'num',min:100,max:4096,desc:'Y軸の分解能（100〜4096）。値が高いほど細かい動きを検出します。高すぎるとノイズが増えることがあります。'},
@@ -1445,6 +1456,44 @@ const TP_SCHEMA=[
     {key:'CONFIG_INPUT_IQS9151_3F_SWIPE_THRESHOLD',label:'Swipe Threshold',type:'num',desc:'3本指スワイプと認識される最小移動量。小さいほど少し動かすだけでスワイプが発動します。'},
   ]},
 ];
+const TP_SECTION_JA={
+  'Cursor Speed':'カーソル速度',
+  'Sensor':'センサー',
+  'Dynamic Filter':'動的フィルター',
+  '1 Finger Gesture':'1本指ジェスチャー',
+  'Cursor Inertia':'カーソル慣性',
+  '2 Finger Gesture':'2本指ジェスチャー',
+  'Scroll Inertia':'スクロール慣性',
+  '2 Finger Pinch':'2本指ピンチ',
+  '3 Finger Gesture':'3本指ジェスチャー',
+};
+const TP_LABEL_JA={
+  'Resolution X':'X方向の分解能',
+  'Resolution Y':'Y方向の分解能',
+  'ATI Target Count':'ATI感度基準値',
+  'Rotation':'取り付け方向',
+  'Bottom Speed':'低速側しきい値',
+  'Top Speed':'高速側しきい値',
+  'Bottom Beta':'低速時の滑らかさ',
+  'Tap Enable':'タップ有効',
+  'Tap Max (ms)':'タップ判定時間',
+  'Tap Move Limit':'タップ中の移動許容量',
+  'Press Hold Enable':'長押し有効',
+  'Tap Drag Gap (ms)':'タップ後ドラッグ待ち時間',
+  'Enable':'有効',
+  'Decay':'減衰の強さ',
+  'Recent Window (ms)':'直近速度を見る時間',
+  'Stale Gap (ms)':'慣性を止める無動作時間',
+  'Min Samples':'必要な移動サンプル数',
+  'Min Avg Speed':'慣性開始の最低速度',
+  'Vertical Scroll':'縦スクロール',
+  'Horizontal Swipe':'横スワイプ動作',
+  'Scroll Start Move':'スクロール開始距離',
+  'Back/Forward Threshold':'戻る/進む判定距離',
+  'Start Distance':'開始距離',
+  'Wheel Gain x10':'ホイール変換倍率',
+  'Swipe Threshold':'スワイプ判定距離',
+};
 const MAIN_SCHEMA=[
   {title:'Power',rows:[
     {key:'CONFIG_ZMK_SLEEP',label:'Sleep Enable',type:'bool',desc:'一定時間操作がない場合に省電力スリープモードへ移行する機能の有効/無効。バッテリー駆動時間を延ばします。'},
@@ -1633,6 +1682,44 @@ function configKeysForRow(row){
   if(row.type==='rotate') return ['CONFIG_INPUT_IQS9151_ROTATE_0','CONFIG_INPUT_IQS9151_ROTATE_90','CONFIG_INPUT_IQS9151_ROTATE_180','CONFIG_INPUT_IQS9151_ROTATE_270'];
   if(row.type==='swipeMode') return ['CONFIG_INPUT_IQS9151_2F_HORIZONTAL_NAV','CONFIG_INPUT_IQS9151_SCROLL_X_ENABLE'];
   return row.key ? [row.key] : [];
+}
+function rowWriteKind(row, cid){
+  if(cid==='tp-settings') return 'fw';
+  return '';
+}
+function syncSettingRowChanged(rowEl, row, cid, configSide){
+  const changed=configKeysForRow(row).some(key=>isConfigKeyChanged(configSide,key));
+  rowEl.classList.toggle('changed-outline-inset',changed);
+  let badge=rowEl.querySelector('.write-badge');
+  const kind=rowWriteKind(row,cid);
+  if(changed && kind==='fw'){
+    if(!badge){
+      badge=document.createElement('span');
+      badge.className='write-badge fw';
+      badge.textContent='FW';
+      badge.title='Save All 後、実機反映には Write firmware (UF2) が必要です。RPC書き込みでは反映されません。';
+      const label=rowEl.querySelector('.slabel');
+      if(label?.nextSibling) rowEl.insertBefore(badge,label.nextSibling);
+      else rowEl.appendChild(badge);
+    }
+  }else if(badge){
+    badge.remove();
+  }
+}
+function formatSettingValue(row, value){
+  if(row.format==='scaleX10') return `${(Number(value)/10).toFixed(1)}x`;
+  return String(value ?? '');
+}
+function rowValue(row, cfgObj){
+  return cfgObj[row.key] ?? row.default ?? row.min ?? '';
+}
+function setRowNumericValue(row, cfgObj, value){
+  let next=parseInt(value,10);
+  if(Number.isNaN(next)) next=row.default ?? row.min ?? 0;
+  if(row.min!==undefined) next=Math.max(row.min,next);
+  if(row.max!==undefined) next=Math.min(row.max,next);
+  cfgObj[row.key]=String(next);
+  return next;
 }
 function hasUnsavedChanges(){
   if(!state.savedSnapshot) return false;
@@ -2983,15 +3070,53 @@ function renderSettingsGrid(schema,cfgObj,cid){
   schema.forEach(sect=>{
     const div=document.createElement('div'); div.className='sect';
     const hdr=document.createElement('div'); hdr.className='sect-hdr';
-    const h3=document.createElement('h3'); h3.textContent=sect.title; hdr.appendChild(h3);
+    const h3=document.createElement('h3');
+    h3.textContent=isTP && (sect.titleJa||TP_SECTION_JA[sect.title]) ? `${sect.title} / ${sect.titleJa||TP_SECTION_JA[sect.title]}` : sect.title;
+    hdr.appendChild(h3);
     if(isTP){ const other=state.tpSide==='left'?'right':'left'; const cb=document.createElement('button'); cb.className='btn sm'; cb.textContent=`Copy to ${other}`; cb.onclick=()=>copyTpSection(sect); hdr.appendChild(cb); }
     div.appendChild(hdr);
     sect.rows.forEach(row=>{
       const r=document.createElement('div'); r.className='srow';
-      if(configKeysForRow(row).some(key=>isConfigKeyChanged(configSide,key))) r.classList.add('changed-outline-inset');
-      const lbl=document.createElement('span'); lbl.className='slabel'; lbl.textContent=row.label; if(row.desc){lbl.classList.add('has-tip');lbl.title=row.desc;} r.appendChild(lbl);
-      if(row.type==='bool'){ const lw=document.createElement('label'); lw.className='toggle'; const inp=document.createElement('input'); inp.type='checkbox'; inp.checked=cfgObj[row.key]==='y'; inp.onchange=()=>{ cfgObj[row.key]=inp.checked?'y':'n'; markUnsaved(); }; const sl=document.createElement('span'); sl.className='tsl'; lw.appendChild(inp); lw.appendChild(sl); r.appendChild(lw); }
-      else if(row.type==='num'){ const inp=document.createElement('input'); inp.type='number'; inp.className='snum'; inp.value=cfgObj[row.key]||''; if(row.min!==undefined) inp.min=row.min; if(row.max!==undefined) inp.max=row.max; inp.oninput=()=>{ cfgObj[row.key]=inp.value; markUnsaved(); }; r.appendChild(inp); }
+      const lbl=document.createElement('span');
+      lbl.className='slabel';
+      const en=document.createElement('span');
+      en.textContent=row.label;
+      lbl.appendChild(en);
+      const jaText=isTP ? (row.ja||TP_LABEL_JA[row.label]||'') : '';
+      if(jaText){ const ja=document.createElement('span'); ja.className='slabel-ja'; ja.textContent=jaText; lbl.appendChild(ja); }
+      if(row.desc){lbl.classList.add('has-tip');lbl.title=row.desc;}
+      r.appendChild(lbl);
+      syncSettingRowChanged(r,row,cid,configSide);
+      if(row.type==='bool'){ const lw=document.createElement('label'); lw.className='toggle'; const inp=document.createElement('input'); inp.type='checkbox'; inp.checked=cfgObj[row.key]==='y'; inp.onchange=()=>{ cfgObj[row.key]=inp.checked?'y':'n'; markUnsaved(); syncSettingRowChanged(r,row,cid,configSide); }; const sl=document.createElement('span'); sl.className='tsl'; lw.appendChild(inp); lw.appendChild(sl); r.appendChild(lw); }
+      else if(row.type==='num'){ const inp=document.createElement('input'); inp.type='number'; inp.className='snum'; inp.value=cfgObj[row.key]||''; if(row.min!==undefined) inp.min=row.min; if(row.max!==undefined) inp.max=row.max; inp.oninput=()=>{ cfgObj[row.key]=inp.value; markUnsaved(); syncSettingRowChanged(r,row,cid,configSide); }; r.appendChild(inp); }
+      else if(row.type==='slider'){
+        const wrap=document.createElement('div');
+        wrap.className='slider-wrap';
+        const range=document.createElement('input');
+        range.type='range';
+        range.className='srange';
+        range.min=row.min;
+        range.max=row.max;
+        range.step=row.step||1;
+        range.value=rowValue(row,cfgObj);
+        const val=document.createElement('span');
+        val.className='slider-value';
+        val.textContent=formatSettingValue(row,range.value);
+        range.oninput=()=>{
+          const next=setRowNumericValue(row,cfgObj,range.value);
+          range.value=String(next);
+          val.textContent=formatSettingValue(row,next);
+          markUnsaved();
+          syncSettingRowChanged(r,row,cid,configSide);
+        };
+        const scale=document.createElement('div');
+        scale.className='slider-scale';
+        scale.innerHTML=`<span>${formatSettingValue(row,row.min)} 遅い</span><span>${formatSettingValue(row,row.default||10)} 標準</span><span>${formatSettingValue(row,row.max)} 速い</span>`;
+        wrap.appendChild(range);
+        wrap.appendChild(val);
+        wrap.appendChild(scale);
+        r.appendChild(wrap);
+      }
       else if(row.type==='rotate'){ const grp=document.createElement('div'); grp.className='rot-grp'; const cur=getRotation(cfgObj); [0,90,180,270].forEach(deg=>{ const b=document.createElement('button'); b.className='rot-btn'+(cur===deg?' active':''); b.textContent=deg+'°'; b.onclick=()=>setRotation(cfgObj,deg,schema,cid); grp.appendChild(b); }); r.appendChild(grp); }
       else if(row.type==='swipeMode'){ const sel=document.createElement('select'); sel.className='sselect'; [{value:'scroll',label:'Horizontal Scroll'},{value:'nav',label:'Back / Forward'}].forEach(opt=>{ const o=document.createElement('option'); o.value=opt.value; o.textContent=opt.label; sel.appendChild(o); }); sel.value=getTwoFingerHorizontalAction(cfgObj); sel.onchange=()=>{ setTwoFingerHorizontalAction(cfgObj,sel.value); renderSettingsGrid(schema,cfgObj,cid); }; r.appendChild(sel); }
       div.appendChild(r);
@@ -3883,6 +4008,41 @@ async function callDeviceRpc(req, timeoutMs=5000){
   });
   return Promise.race([zmk.core.call_rpc(state.device.conn,req),timeout]);
 }
+function sleep(ms){ return new Promise(resolve=>setTimeout(resolve,ms)); }
+async function closeUsbSerialPort(port){
+  if(!port) return;
+  try{ await port.writable?.close(); }catch(_e){}
+  try{ await port.readable?.cancel(); }catch(_e){}
+  try{ await port.close(); }catch(_e){}
+}
+async function cleanupDeviceTransport(reason='cleanup'){
+  const transport=state.device?.transport;
+  if(!transport) return;
+  try{ transport.abortController?.abort(reason); }catch(_e){}
+  if(transport.port) await closeUsbSerialPort(transport.port);
+  await sleep(80);
+}
+async function openUsbSerialPort(port){
+  if(port.readable||port.writable){
+    await closeUsbSerialPort(port);
+    await sleep(120);
+  }
+  try{
+    await port.open({baudRate:12500});
+  }catch(e){
+    const msg=e?.message||String(e);
+    if(msg.includes('already open')||e?.name==='InvalidStateError'){
+      await closeUsbSerialPort(port);
+      await sleep(180);
+      await port.open({baudRate:12500});
+      return;
+    }
+    if(e instanceof DOMException && e.name==='NetworkError'){
+      throw new Error('Failed to open the serial port. Close other serial/terminal apps and try again.');
+    }
+    throw e;
+  }
+}
 async function requestUsbSerialTransport(){
   const report=refreshUsbDiag();
   if(!report.secure){
@@ -3897,24 +4057,15 @@ async function requestUsbSerialTransport(){
   const abortController=new AbortController();
   deviceLog('Opening browser USB serial picker...');
   const port=await navigator.serial.requestPort({});
-  try{
-    await port.open({baudRate:12500});
-  }catch(e){
-    if(e instanceof DOMException && e.name==='NetworkError'){
-      throw new Error('Failed to open the serial port. Close other serial/terminal apps and try again.');
-    }
-    throw e;
-  }
+  await openUsbSerialPort(port);
   const info=port.getInfo?.()||{};
   const label=[info.usbVendorId,info.usbProductId].filter(v=>v!==undefined).join(':')||'USB serial device';
   const closePort=async()=>{
     abortController.signal.removeEventListener('abort',closePort);
-    try{ await port.writable?.close(); }catch(_e){}
-    try{ await port.readable?.cancel(); }catch(_e){}
-    try{ await port.close(); }catch(_e){}
+    await closeUsbSerialPort(port);
   };
   abortController.signal.addEventListener('abort',closePort);
-  return {label,abortController,readable:port.readable,writable:port.writable};
+  return {label,abortController,port,readable:port.readable,writable:port.writable};
 }
 async function testUsbSerialDialog(){
   try{
@@ -3933,10 +4084,13 @@ async function testUsbSerialDialog(){
   }
 }
 async function connectDevice(mode){
+  let transport=null;
   try{
     setDeviceStatus('Connecting...','warn');
     deviceLog(`Connecting via ${mode.toUpperCase()}...`);
-    const transport=mode==='usb' ? await requestUsbSerialTransport() : null;
+    await cleanupDeviceTransport('reconnect');
+    state.device={conn:null,transport:null,label:'',mode:'',keymap:null,behaviors:null,realtime:state.device.realtime};
+    transport=mode==='usb' ? await requestUsbSerialTransport() : null;
     const zmk=await loadZmkStudioClient();
     const activeTransport=transport || await zmk.gatt.connect();
     const conn=zmk.core.create_rpc_connection(activeTransport,{signal:activeTransport.abortController.signal});
@@ -3951,6 +4105,12 @@ async function connectDevice(mode){
     deviceLog('Device keymap loaded. Use Write keymap (RPC) to push changed layer bindings only.');
     return true;
   }catch(e){
+    if(transport){
+      try{ transport.abortController?.abort('connection failed'); }catch(_e){}
+      if(transport.port) await closeUsbSerialPort(transport.port);
+    }
+    state.device={conn:null,transport:null,label:'',mode:'',keymap:null,behaviors:null,realtime:state.device.realtime};
+    updateDevicePanel();
     const msg=e?.message||String(e);
     setDeviceStatus('Connection failed','err');
     deviceLog(`Connection failed: ${msg}`);
@@ -3958,8 +4118,8 @@ async function connectDevice(mode){
     return false;
   }
 }
-function disconnectDevice(){
-  try{ state.device.transport?.abortController?.abort('user disconnect'); }catch(_e){}
+async function disconnectDevice(){
+  await cleanupDeviceTransport('user disconnect');
   state.device={conn:null,transport:null,label:'',mode:'',keymap:null,realtime:state.device.realtime};
   setDeviceStatus('Disconnected');
   updateDevicePanel();
