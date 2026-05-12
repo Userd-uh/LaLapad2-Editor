@@ -3960,6 +3960,56 @@ function refreshUsbDiag(){
   setUsbDiag(msg,cls);
   return report;
 }
+function bleSupportReport(){
+  const lines=[];
+  const href=location.href;
+  const secure=!!window.isSecureContext;
+  const hasBluetooth=!!navigator.bluetooth?.requestDevice;
+  const isWindows=/Windows NT/i.test(navigator.userAgent);
+  const activation=navigator.userActivation
+    ? `active=${navigator.userActivation.isActive}, hasBeenActive=${navigator.userActivation.hasBeenActive}`
+    : 'unavailable';
+  lines.push(`URL: ${href}`);
+  lines.push(`Secure context: ${secure ? 'yes' : 'no'}`);
+  lines.push(`Web Bluetooth API: ${hasBluetooth ? 'available' : 'not available'}`);
+  lines.push(`Windows browser: ${isWindows ? 'yes' : 'no'}`);
+  lines.push(`User activation: ${activation}`);
+  lines.push(`Browser: ${navigator.userAgent}`);
+  return {secure,hasBluetooth,isWindows,lines};
+}
+function explainBleConnectionError(error){
+  const msg=error?.message||String(error);
+  const name=error?.name||error?.cause?.name||'';
+  if(msg.includes('User cancelled')||name==='NotFoundError'){
+    return [
+      'BLE device selection was cancelled or no matching ZMK Studio BLE device was found.',
+      'Put the central half in Bluetooth advertising mode, disconnect it from other hosts if necessary, and select the device that exposes the ZMK Studio service.',
+      'If the device only appears as a normal keyboard, rebuild/flash the central side with CONFIG_ZMK_STUDIO=y and Studio BLE support, or use USB RPC instead.'
+    ].join(' ');
+  }
+  if(msg.includes('Bluetooth adapter not available')||msg.includes('Bluetooth adapter is not available')){
+    return 'Bluetooth adapter is not available. Turn on Windows Bluetooth and retry from Chrome or Edge.';
+  }
+  return msg;
+}
+async function requestBleTransport(){
+  const report=bleSupportReport();
+  report.lines.forEach(line=>deviceLog(line));
+  if(!report.secure){
+    throw new Error('Web Bluetooth requires a secure context. Open this editor from http://localhost:5173.');
+  }
+  if(!report.hasBluetooth){
+    throw new Error('This browser does not support Web Bluetooth here. Use desktop Chrome or Microsoft Edge, or connect through USB RPC.');
+  }
+  if(report.isWindows){
+    throw new Error('ZMK Studio BLE is not supported from the Windows web browser path. Use Connect USB in this editor, or use the native ZMK Studio app for BLE.');
+  }
+  if(navigator.userActivation && !navigator.userActivation.isActive){
+    throw new Error('BLE selection was blocked because the browser did not treat this as a direct button click. Press Connect Bluetooth once more.');
+  }
+  const zmk=await loadZmkStudioClient();
+  return zmk.gatt.connect();
+}
 function updateDevicePanel(){
   const transport=document.getElementById('device-transport');
   const label=document.getElementById('device-label');
@@ -4090,9 +4140,9 @@ async function connectDevice(mode){
     deviceLog(`Connecting via ${mode.toUpperCase()}...`);
     await cleanupDeviceTransport('reconnect');
     state.device={conn:null,transport:null,label:'',mode:'',keymap:null,behaviors:null,realtime:state.device.realtime};
-    transport=mode==='usb' ? await requestUsbSerialTransport() : null;
+    transport=mode==='usb' ? await requestUsbSerialTransport() : await requestBleTransport();
     const zmk=await loadZmkStudioClient();
-    const activeTransport=transport || await zmk.gatt.connect();
+    const activeTransport=transport;
     const conn=zmk.core.create_rpc_connection(activeTransport,{signal:activeTransport.abortController.signal});
     state.device={...state.device,conn,transport:activeTransport,label:activeTransport.label||'',mode:mode.toUpperCase(),keymap:null,behaviors:null};
     const info=await callDeviceRpc({core:{getDeviceInfo:true}});
@@ -4111,7 +4161,7 @@ async function connectDevice(mode){
     }
     state.device={conn:null,transport:null,label:'',mode:'',keymap:null,behaviors:null,realtime:state.device.realtime};
     updateDevicePanel();
-    const msg=e?.message||String(e);
+    const msg=mode==='ble' ? explainBleConnectionError(e) : (e?.message||String(e));
     setDeviceStatus('Connection failed','err');
     deviceLog(`Connection failed: ${msg}`);
     setStatus('MCU connection error: '+msg,'s-err');

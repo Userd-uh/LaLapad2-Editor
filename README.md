@@ -159,7 +159,7 @@ RemapLaLapadGen2/
 
 `Write firmware (UF2)` は、タップダンス、マクロ、コンボ、条件付きレイヤー、タッチパッドの `.conf` / Kconfig 設定を含めて `Save All` し、設定したビルドコマンドを実行して、生成された UF2 を指定ドライブへコピーします。ビルドコマンドでは `{firmware_folder}` と `{config_dir}` のプレースホルダーを使えます。
 
-`Realtime keymap write` を有効にすると、編集後の短い待ち時間で接続中のマイコンへキー割当の差分を書き込みます。USB と Bluetooth のどちらも ZMK Studio RPC を使用します。Bluetooth はブラウザ/OS の Web Bluetooth 対応状況に依存します。
+`Realtime keymap write` を有効にすると、編集後の短い待ち時間で接続中のマイコンへキー割当の差分を書き込みます。USB と Bluetooth のどちらも ZMK Studio RPC を使用します。Bluetooth は ZMK Studio 側の対応範囲に依存し、Windows のブラウザ経由ではなく USB 接続または native ZMK Studio アプリの利用を推奨します。
 
 ### タップダンスの設定
 
