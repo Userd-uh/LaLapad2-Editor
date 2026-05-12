@@ -21,9 +21,9 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .d-none{display:none!important;}
 
 header{background:linear-gradient(180deg,#101a27,#0e1621);border-bottom:1px solid rgba(94,234,212,.35);padding:6px 14px;
-  display:flex;align-items:center;gap:8px;flex-shrink:0;}
+  display:flex;align-items:center;gap:8px;flex-shrink:0;flex-wrap:wrap;}
 header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;letter-spacing:.02em;}
-.file-status{flex:1;font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.file-status{flex:1 1 180px;font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .btn{padding:5px 11px;border:1px solid var(--bdr2);border-radius:4px;background:var(--bg3);
   color:var(--text);cursor:pointer;font-size:12px;white-space:nowrap;transition:background .12s;}
 .btn:hover{background:var(--khov);}
@@ -32,6 +32,13 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
 .btn.blue{background:var(--a3);border-color:var(--a3);}
 .btn.blue:hover{background:#129285;}
 .btn.sm{padding:3px 8px;font-size:11px;}
+.toolbar-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.toolbar-group.run-actions{padding-left:8px;border-left:1px solid var(--bdr2);}
+.toolbar-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
+.btn.rpc{border-color:#2563eb;background:#17305c;color:#bfdbfe;}
+.btn.rpc:hover{background:#1d4f8f;}
+.btn.firmware{border-color:#b45309;background:#3a240b;color:#fcd34d;}
+.btn.firmware:hover{background:#5a3308;}
 .unsaved{color:var(--warn);font-size:18px;line-height:1;}
 
 .main-tabs{background:var(--bg2);display:flex;padding:0 14px;border-bottom:1px solid var(--bdr);flex-shrink:0;}
@@ -414,9 +421,17 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
 <header>
   <h1>LaLapad Gen2 Editor</h1>
   <span class="file-status" id="file-status">No file loaded</span>
-  <button class="btn" onclick="openSettings()">Settings</button>
-  <button class="btn primary" id="save-btn" onclick="saveAll()" title="Ctrl+S">Save All</button>
-  <button class="btn blue" onclick="writeFullFirmwareNow()" title="Save, build, and copy UF2">Write MCU</button>
+  <div class="toolbar-group">
+    <button class="btn" onclick="openSettings()">Settings</button>
+    <button class="btn primary" id="save-btn" onclick="saveAll()" title="Save all editor changes to the firmware folder. Ctrl+S">Save All</button>
+  </div>
+  <div class="toolbar-group run-actions" aria-label="MCU actions">
+    <span class="toolbar-label">Run</span>
+    <button class="btn" id="connect-usb-btn" onclick="connectDevice('usb')" title="Open the USB serial picker and connect through ZMK Studio RPC.">Connect USB</button>
+    <button class="btn" id="connect-ble-btn" onclick="connectDevice('ble')" title="Connect through Web Bluetooth and ZMK Studio RPC.">Connect Bluetooth</button>
+    <button class="btn rpc" id="write-rpc-btn" onclick="writeDeviceNow()" title="Layer key bindings only. Uses ZMK Studio RPC and does not rebuild firmware.">Write keymap (RPC)</button>
+    <button class="btn firmware" id="write-firmware-btn" onclick="writeFullFirmwareNow()" title="Save all, build firmware, then copy the generated UF2 to the bootloader drive.">Write firmware (UF2)</button>
+  </div>
   <span class="unsaved d-none" id="unsaved-dot" title="Unsaved changes">*</span>
 </header>
 
@@ -491,26 +506,22 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
         <span class="device-status" id="device-status">Disconnected</span>
       </div>
       <div class="device-row">
-        <button class="btn primary" onclick="connectDevice('usb')">Connect USB</button>
-        <button class="btn blue" onclick="connectDevice('ble')">Connect Bluetooth</button>
         <button class="btn" onclick="disconnectDevice()">Disconnect</button>
-        <button class="btn primary" onclick="writeDeviceNow()">Write RPC keymap</button>
-        <button class="btn blue" onclick="writeFullFirmwareNow()">Full firmware write</button>
         <button class="btn" onclick="testUsbSerialDialog()">Test USB Dialog</button>
         <label class="toggle" title="接続中のマイコンへキー割当の変更を短い待ち時間で反映します">
           <input type="checkbox" id="device-realtime" onchange="setDeviceRealtime(this.checked)">
           <span class="tsl"></span>
         </label>
-        <span style="font-size:11px;color:var(--dim)">Realtime keymap write</span>
+        <span style="font-size:11px;color:var(--dim)">Toggle: Realtime keymap write (RPC layer keys only)</span>
       </div>
       <div class="device-kv" style="margin-top:10px">
         <b>Transport</b><span id="device-transport">-</span>
         <b>Device</b><span id="device-label">-</span>
-        <b>RPC writable</b><span id="device-writable">Layer key bindings supported by ZMK Studio RPC</span>
-        <b>Firmware writable</b><span>Tap dance, macro, combo, conditional layers, and .conf/Kconfig via build + UF2 copy</span>
+        <b>Write keymap (RPC)</b><span id="device-writable">Layer key bindings only. Does not rebuild or replace firmware.</span>
+        <b>Write firmware (UF2)</b><span>Full firmware replacement: Save All, build, then copy UF2. Includes tap dance, macro, combo, conditional layers, and .conf/Kconfig changes.</span>
       </div>
       <p class="device-note" style="margin-top:10px">
-        RPC書き込みはZMK Studioの即時反映です。Full firmware write は Save All の内容をビルドし、生成済みUF2をブートローダードライブへコピーします。
+        ヘッダーの MCU 操作は実行ボタンです。Write keymap (RPC) はレイヤーのキー割当だけをZMK Studio RPCで即時反映します。Write firmware (UF2) はファームウェア全体を書き換える操作です。
       </p>
       <div class="firmware-grid">
         <label>Build command</label>
@@ -913,6 +924,36 @@ function getLayerIndices(){ return Array.from({length:Math.max(state.layers.leng
 function getConditionalLayerHint(){
   return 'On this keyboard, holding layer 1 and layer 2 together also activates layer 3 through conditional layers.';
 }
+function layerDisplayName(index){
+  const n=Number(index);
+  const rawIndex=(index===undefined||index===null||index==='') ? '?' : String(index);
+  const fallback=Number.isFinite(n) ? `Layer ${rawIndex}` : `Layer ${rawIndex}`;
+  const name=state.layers?.[n]?.display_name;
+  return (name&&String(name).trim()) ? String(name).trim() : fallback;
+}
+function layerBindingLabel(prefix, index, suffix=''){
+  const n=(index===undefined||index===null||index==='') ? '?' : String(index);
+  const name=layerDisplayName(n);
+  const op=`${prefix}${n}${suffix ? ' '+suffix : ''}`;
+  return `${name}\n${op}`;
+}
+function layerBindingTitle(prefix, index, action){
+  const n=(index===undefined||index===null||index==='') ? '?' : String(index);
+  return `${action}: ${layerDisplayName(n)} (${prefix}${n})`;
+}
+function describeLayerBinding(raw){
+  const p=(raw||'').trim().replace(/^&/,'').split(/\s+/);
+  const beh=p[0],a=p.slice(1);
+  if(!a.length) return '';
+  switch(beh){
+    case 'mo': return layerBindingTitle('MO',a[0],'Momentary layer');
+    case 'to': return layerBindingTitle('TO',a[0],'Switch to layer');
+    case 'tog': return layerBindingTitle('TG',a[0],'Toggle layer');
+    case 'sl': return layerBindingTitle('SL',a[0],'Sticky layer');
+    case 'lt': return `${layerBindingTitle('LT',a[0],'Layer-tap hold layer')}; tap ${shortKeyLabel(a[1]||'?')}`;
+    default: return '';
+  }
+}
 
 // 笏笏 繝舌う繝ｳ繝・ぅ繝ｳ繧ｰ 繝ｩ繝吶Ν/繧ｯ繝ｩ繧ｹ 笏笏
 const BUILTINS=new Set(['kp','mt','mo','to','tog','lt','mkp','bt','out','sys_reset','bootloader',
@@ -927,6 +968,13 @@ function bindingLabel(raw){
     const inner=s.replace(/^&kp\s+/,'');
     if(inner.includes('(')) return shortKeyLabel(inner);
   }
+  const layerM=s.match(/^&(mo|to|tog|sl)\s+(\S+)$/);
+  if(layerM){
+    const prefix={mo:'MO',to:'TO',tog:'TG',sl:'SL'}[layerM[1]];
+    return layerBindingLabel(prefix,layerM[2]);
+  }
+  const ltM=s.match(/^&lt\s+(\S+)\s+(.+)$/);
+  if(ltM) return layerBindingLabel('LT',ltM[1],shortKeyLabel(ltM[2]));
   // パレット定義のラベルを最優先で参照（パレットとキーマップの表示を統一）
   if(PAL_LABEL[s]) return PAL_LABEL[s];
   if(s==='&trans') return '▽';
@@ -953,12 +1001,12 @@ function bindingLabel(raw){
   switch(beh){
     case 'kp': return shortKeyLabel(a[0]||'?');
     case 'mt':case 'mt2': return shortKeyLabel(a[1]||'?')+'\n'+shortKeyLabel(a[0]||'?');
-    case 'lt': return `LT(${a[0]||'?'})\n${kl(a[1]||'?')}`;
-    case 'mo': return `MO${a[0]||'?'}`;
-    case 'to': return `TO${a[0]||'?'}`;
-    case 'tog': return `TG${a[0]||'?'}`;
+    case 'lt': return layerBindingLabel('LT',a[0]||'?',shortKeyLabel(a[1]||'?'));
+    case 'mo': return layerBindingLabel('MO',a[0]||'?');
+    case 'to': return layerBindingLabel('TO',a[0]||'?');
+    case 'tog': return layerBindingLabel('TG',a[0]||'?');
     case 'sk': return 'OSM\n'+shortKeyLabel(a[0]||'?');
-    case 'sl': return `SL${a[0]||'?'}`;
+    case 'sl': return layerBindingLabel('SL',a[0]||'?');
     case 'mkp': return({LCLK:'MB1',RCLK:'MB2',MCLK:'MB3',MB4:'MB4',MB5:'MB5'})[a[0]]||a[0]||'?';
     case 'bt':
       if(a[0]==='BT_SEL') return 'BT'+(a[1]||'?');
@@ -1083,7 +1131,7 @@ const PAL_CATS=[
   {id:'basic',label:'蝓ｺ譛ｬ (QWERTY)',type:'qwerty'},
   {id:'fn',label:'Fn',keys:Array.from({length:15},(_,i)=>({r:`&kp F${i+1}`,l:`F${i+1}`}))},
   {id:'numpad',label:'繝・Φ繧ｭ繝ｼ',keys:[{r:'&kp KP_NUMBER_7',l:'K7'},{r:'&kp KP_NUMBER_8',l:'K8'},{r:'&kp KP_NUMBER_9',l:'K9'},{r:'&kp KP_PLUS',l:'K+'},{r:'&kp KP_NUMBER_4',l:'K4'},{r:'&kp KP_NUMBER_5',l:'K5'},{r:'&kp KP_NUMBER_6',l:'K6'},{r:'&kp KP_MINUS',l:'K-'},{r:'&kp KP_NUMBER_1',l:'K1'},{r:'&kp KP_NUMBER_2',l:'K2'},{r:'&kp KP_NUMBER_3',l:'K3'},{r:'&kp KP_ASTERISK',l:'K*'},{r:'&kp KP_NUMBER_0',l:'K0'},{r:'&kp KP_DOT',l:'K.'},{r:'&kp KP_DIVIDE',l:'K/'},{r:'&kp KP_NUMLOCK',l:'NLK'}]},
-  {id:'layer',label:'繝ｬ繧､繝､繝ｼ',keys:[{r:'&mo 1',l:'MO1(sys)'},{r:'&mo 2',l:'MO2(ter)'},{r:'&mo 3',l:'MO3(sec)'},{r:'&mo 4',l:'MO4'},{r:'&to 0',l:'TO0'},{r:'&to 1',l:'TO1'},{r:'&to 2',l:'TO2'},{r:'&to 3',l:'TO3'},{r:'&tog 1',l:'TG1'},{r:'&tog 2',l:'TG2'},{r:'&tap_dance_layer_1and2',l:'TD\n1&2'},{r:'&lt 1 SPACE',l:'LT1\nSPC'},{r:'&lt 2 SPACE',l:'LT2\nSPC'},{r:'&sl 1',l:'SL1'},{r:'&sl 2',l:'SL2'}]},
+  {id:'layer',label:'Layers',keys:[{r:'&mo 1',l:'MO1'},{r:'&mo 2',l:'MO2'},{r:'&mo 3',l:'MO3'},{r:'&mo 4',l:'MO4'},{r:'&to 0',l:'TO0'},{r:'&to 1',l:'TO1'},{r:'&to 2',l:'TO2'},{r:'&to 3',l:'TO3'},{r:'&tog 1',l:'TG1'},{r:'&tog 2',l:'TG2'},{r:'&tap_dance_layer_1and2',l:'TD\n1&2'},{r:'&lt 1 SPACE',l:'LT1\nSPC'},{r:'&lt 2 SPACE',l:'LT2\nSPC'},{r:'&sl 1',l:'SL1'},{r:'&sl 2',l:'SL2'}]},
   {id:'mouse',label:'繝槭え繧ｹ',keys:[{r:'&mkp LCLK',l:'MB1'},{r:'&mkp RCLK',l:'MB2'},{r:'&mkp MCLK',l:'MB3'},{r:'&mkp MB4',l:'MB4'},{r:'&mkp MB5',l:'MB5'}]},
   {id:'bt',label:'BT',keys:[{r:'&bt BT_SEL 0',l:'BT0'},{r:'&bt BT_SEL 1',l:'BT1'},{r:'&bt BT_SEL 2',l:'BT2'},{r:'&bt BT_SEL 3',l:'BT3'},{r:'&bt BT_CLR',l:'CLR'},{r:'&bt BT_CLR_ALL',l:'CLRA'},{r:'&out OUT_TOG',l:'OUT'}]},
   {id:'quantum',label:'Quantum',type:'quantum_grouped',groups:QUANTUM_GROUPS},
@@ -1281,18 +1329,18 @@ function getLayerPaletteRows(){
     [
       ...upperLayers.map(n=>({
         r:`&mo ${n}`,
-        l:`MO${n}`,
-        title:n===1||n===2 ? `Momentarily activates layer ${n} while held. ${getConditionalLayerHint()}` : `Momentarily activates layer ${n} while held.`,
+        l:layerBindingLabel('MO',n),
+        title:n===1||n===2 ? `${layerBindingTitle('MO',n,'Momentary layer while held')}. ${getConditionalLayerHint()}` : `${layerBindingTitle('MO',n,'Momentary layer while held')}.`,
       })),
     ],
     [
-      {r:'&tog 0',l:'TG0',title:'Toggles layer 0 on or off.'},
-      ...upperLayers.map(n=>({r:`&tog ${n}`,l:`TG${n}`,title:`Toggles layer ${n} on or off.`})),
-      ...layers.map(n=>({r:`&sl ${n}`,l:`SL${n}`,title:`Sticky layer ${n}; applies to the next key press only. ZMK uses &sl here, which is the QMK OSL equivalent.`})),
-      ...layers.map(n=>({r:`&to ${n}`,l:`TO${n}`,title:`Turns to layer ${n} and deactivates the others.`})),
+      {r:'&tog 0',l:layerBindingLabel('TG',0),title:`${layerBindingTitle('TG',0,'Toggle layer on/off')}.`},
+      ...upperLayers.map(n=>({r:`&tog ${n}`,l:layerBindingLabel('TG',n),title:`${layerBindingTitle('TG',n,'Toggle layer on/off')}.`})),
+      ...layers.map(n=>({r:`&sl ${n}`,l:layerBindingLabel('SL',n),title:`${layerBindingTitle('SL',n,'Sticky layer for next key press')}. ZMK uses &sl here, which is the QMK OSL equivalent.`})),
+      ...layers.map(n=>({r:`&to ${n}`,l:layerBindingLabel('TO',n),title:`${layerBindingTitle('TO',n,'Switch to layer')}; deactivates the others.`})),
     ],
     [
-      ...layers.map(n=>({r:`&lt ${n} ${MOD_PH}`,l:`LT ${n}\n(kc)`,title:`Tap sends a key, hold momentarily activates layer ${n}.`})),
+      ...layers.map(n=>({r:`&lt ${n} ${MOD_PH}`,l:layerBindingLabel('LT',n,'kc'),title:`Tap sends a key; hold momentarily activates ${layerDisplayName(n)} (LT${n}).`})),
     ],
   ];
 }
@@ -1711,9 +1759,9 @@ async function saveAll(opts={}){
     await refreshSettingsMeta();
     if(!skipRealtime && state.device.realtime && state.device.conn){
       const deviceResult=await applyKeymapToDevice({quiet:true});
-      if(deviceResult.error){ setStatus(`Saved files, MCU write error: ${deviceResult.error}`,'s-warn'); return false; }
+      if(deviceResult.error){ setStatus(`Saved files, RPC keymap write error: ${deviceResult.error}`,'s-warn'); return false; }
       if(deviceResult.unsupportedCount>0){
-        setStatus(`Saved files. MCU wrote ${deviceResult.changedCount} keys; ${deviceResult.unsupportedCount} bindings need firmware rebuild/ZMK Studio support.`,'s-warn');
+        setStatus(`Saved files. RPC wrote ${deviceResult.changedCount} layer keys; ${deviceResult.unsupportedCount} bindings need firmware rebuild/ZMK Studio support.`,'s-warn');
         markSaved();
         return true;
       }
@@ -1859,8 +1907,10 @@ function renderKeyboard(){
     el.className=`key ${cls}`; el.dataset.idx=idx;
     const mcTip=b.raw.match(MACRO_RE);
     const tdTip=b.raw.match(/^&td(\d+)$/);
+    const layerTip=describeLayerBinding(b.raw);
     const keyTitle=mcTip ? `${b.raw}${state.macroDefs[+mcTip[1]]?.display_name?' — '+state.macroDefs[+mcTip[1]].display_name:''}`
       : tdTip ? `${b.raw}${state.tdDefs[+tdTip[1]]?.display_name?' — '+state.tdDefs[+tdTip[1]].display_name:''}`
+      : layerTip ? `${b.raw} — ${layerTip}`
       : b.raw;
     el.title=keyTitle;
     bindHoverCode(el,keyTitle);
@@ -3649,7 +3699,7 @@ function renderMacroTab(){
   renderPalette();
 }
 
-// ---- MCU write via ZMK Studio RPC ----
+// ---- Layer keymap write via ZMK Studio RPC ----
 function deviceLog(message){
   const el=document.getElementById('device-log');
   if(!el) return;
@@ -3707,7 +3757,7 @@ function updateDevicePanel(){
 }
 function setDeviceRealtime(value){
   state.device.realtime=!!value;
-  deviceLog(`Realtime keymap write: ${state.device.realtime?'on':'off'}`);
+  deviceLog(`Realtime keymap write (RPC layer keys only): ${state.device.realtime?'on':'off'}`);
   if(state.device.realtime) scheduleRealtimeDeviceWrite();
 }
 function scheduleRealtimeDeviceWrite(){
@@ -3809,7 +3859,7 @@ async function connectDevice(mode){
     setDeviceStatus('Connected','ok');
     updateDevicePanel();
     deviceLog(`Connected: ${name}`);
-    deviceLog('Device keymap loaded. Use Write current keymap to push changed layer bindings.');
+    deviceLog('Device keymap loaded. Use Write keymap (RPC) to push changed layer bindings only.');
     return true;
   }catch(e){
     const msg=e?.message||String(e);
@@ -4077,7 +4127,7 @@ function collectLayerBindingChanges(rawMap){
   return {changes,unsupported};
 }
 async function applyKeymapToDevice({quiet=false}={}){
-  if(!state.device.conn) return {error:'MCU is not connected. Click Write MCU again and select the USB serial device.'};
+  if(!state.device.conn) return {error:'MCU is not connected. Click Write keymap (RPC) again and select the USB serial device.'};
   if(!state.layers.length) return {error:'Keymap is not loaded.'};
   try{
     const latest=await callDeviceRpc({keymap:{getKeymap:true}},8000);
@@ -4197,21 +4247,21 @@ async function writeFullFirmwareNow(){
 async function writeDeviceNow(){
   if(!state.device.conn){
     setStatus('Connecting to MCU over USB...');
-    deviceLog('No active MCU connection. Opening USB serial picker before writing...');
+    deviceLog('No active MCU connection. Opening USB serial picker before RPC keymap write...');
     const connected=await connectDevice('usb');
     if(!connected) return;
   }
-  setStatus('Writing keymap to MCU...');
+  setStatus('Writing layer keymap to MCU via RPC...');
   const result=await applyKeymapToDevice();
   if(result.error){
-    setStatus('MCU write error: '+result.error,'s-err');
+    setStatus('RPC keymap write error: '+result.error,'s-err');
     deviceLog('Write error: '+result.error);
     return;
   }
   if(result.unsupportedCount>0){
-    setStatus(`MCU wrote ${result.changedCount} keys; ${result.unsupportedCount} items require firmware rebuild. See Device log for details.`, 's-warn');
+    setStatus(`RPC wrote ${result.changedCount} layer keys; ${result.unsupportedCount} items require firmware rebuild. See Device log for details.`, 's-warn');
   }else{
-    setStatus(`MCU write complete (${result.changedCount} keys).`,'s-ok');
+    setStatus(`RPC keymap write complete (${result.changedCount} layer keys).`,'s-ok');
   }
 }
 

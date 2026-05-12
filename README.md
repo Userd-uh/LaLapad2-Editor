@@ -148,16 +148,16 @@ RemapLaLapadGen2/
 #### レイヤー上のキー割当だけを即時反映する
 
 1. ファームウェアを `CONFIG_ZMK_STUDIO=y` かつ central 側に `snippet: studio-rpc-usb-uart` を含めてビルド/書き込みします
-2. Device タブで `Connect USB` または `Connect Bluetooth` を押します
-3. キーマップを編集後、Device タブの `Write RPC keymap` を押すと、ZMK Studio RPC で実機へ反映します
+2. ヘッダー上部の `Connect USB` または `Connect Bluetooth` を押します
+3. キーマップを編集後、ヘッダー上部の `Write keymap (RPC)` を押すと、ZMK Studio RPC でレイヤー上のキー割当だけを実機へ反映します
 
 #### タップダンス、マクロ、コンボ、条件付きレイヤー、タッチパッド設定まで反映する
 
 1. Device タブで `Build command`、`Build cwd`、`UF2 file`、`Flash target` を設定します
 2. キーボードをブートローダーモードにして、UF2 ドライブを Windows にマウントします
-3. `Full firmware write` またはヘッダーの `Write MCU` を押します
+3. ヘッダー上部の `Write firmware (UF2)` を押します
 
-`Full firmware write` は、タップダンス、マクロ、コンボ、条件付きレイヤー、タッチパッドの `.conf` / Kconfig 設定を含めて `Save All` し、設定したビルドコマンドを実行して、生成された UF2 を指定ドライブへコピーします。ビルドコマンドでは `{firmware_folder}` と `{config_dir}` のプレースホルダーを使えます。
+`Write firmware (UF2)` は、タップダンス、マクロ、コンボ、条件付きレイヤー、タッチパッドの `.conf` / Kconfig 設定を含めて `Save All` し、設定したビルドコマンドを実行して、生成された UF2 を指定ドライブへコピーします。ビルドコマンドでは `{firmware_folder}` と `{config_dir}` のプレースホルダーを使えます。
 
 `Realtime keymap write` を有効にすると、編集後の短い待ち時間で接続中のマイコンへキー割当の差分を書き込みます。USB と Bluetooth のどちらも ZMK Studio RPC を使用します。Bluetooth はブラウザ/OS の Web Bluetooth 対応状況に依存します。
 
@@ -179,6 +179,8 @@ RemapLaLapadGen2/
 
 - このツールは LaLapad Gen2 向けの補助エディタであり、ZMK やキーボード本体の公式設定ツールではありません
 - 書き込み先の `.keymap` / `.conf` / モジュール関連ファイルは直接更新されるため、利用前に対象ファイルや ZMK config リポジトリ全体のバックアップを取ることをおすすめします
+- <span style="color: red; ">但し、デバイスへの反映はエディター上で表示されているキーに変更ではなくて、
+エディタ上で変更した箇所がデバイスに反映されます。そのため、'.keymap'ファイルの内容とデバイスに記録されている内容が異なることがあります。</span>
 - `settings.json` にはローカル環境のパス情報やマクロ定義が保存されます。公開リポジトリへ含めないよう、そのまま `.gitignore` から外さないでください
 - 自動導入されるカスタムモジュールは、既存の ZMK ワークスペース構成や運用方法によっては競合する場合があります。競合メッセージが表示されたときは内容を確認してから手動で反映してください
 - 保存後のビルド成否や実機での動作は、利用している ZMK のバージョン、追加モジュール、手元の設定内容に依存します。保存後は必ずビルドと実機確認を行ってください
