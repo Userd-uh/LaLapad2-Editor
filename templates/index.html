@@ -70,6 +70,8 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
   transition:border-color .1s,background .1s;}
 .key:hover{background:var(--khov);border-color:var(--a2);}
 .key.drag-over{background:#1d4ed8!important;border-color:#60a5fa!important;transform:scale(1.06);}
+.changed-outline{border-color:var(--err)!important;box-shadow:0 0 0 2px rgba(248,113,113,.95),0 0 0 5px rgba(248,113,113,.18)!important;}
+.changed-outline-inset{border-color:var(--err)!important;box-shadow:inset 0 0 0 2px rgba(248,113,113,.95),0 0 0 2px rgba(248,113,113,.18)!important;}
 /* &trans: 騾壼ｸｸ繧ｭ繝ｼ縺ｨ蜷後§閭梧勹濶ｲ縲≫命繧定埋縺剰｡ｨ遉ｺ */
 .key.k-trans{background:var(--kbg);color:var(--text);border-style:dashed;}
 /* &none: 證励＞縲∬埋縺・ｵ､ */
@@ -1481,6 +1483,7 @@ const state={
   currentTab:'keymap',
   paletteContext:null,
   baselineLayers:[],
+  savedSnapshot:null,
   device:{conn:null,transport:null,label:'',mode:'',keymap:null,realtime:false},
 };
 
@@ -1582,12 +1585,83 @@ function bindHoverCode(el, raw){
   el.addEventListener('mouseenter',()=>setHoverCode(raw||''));
   el.addEventListener('mouseleave',()=>setHoverCode(''));
 }
+function stableJson(value){ return JSON.stringify(value ?? null); }
+function makeSavedSnapshot(){
+  return {
+    layers:deepClone(state.layers||[]),
+    combos:deepClone(state.combos||[]),
+    conditionalLayers:deepClone(state.conditionalLayers||[]),
+    tdDefs:deepClone(state.tdDefs||[]),
+    macroDefs:deepClone(state.macroDefs||[]),
+    tpConfigs:deepClone(state.tpConfigs||{left:{},right:{}}),
+    mainConfig:deepClone(state.mainConfig||{}),
+  };
+}
+function resetSavedSnapshot(scope='all', side=null){
+  if(!state.savedSnapshot || scope==='all') state.savedSnapshot=makeSavedSnapshot();
+  else if(scope==='layers') state.savedSnapshot.layers=deepClone(state.layers||[]);
+  else if(scope==='config'){
+    if(side==='main') state.savedSnapshot.mainConfig=deepClone(state.mainConfig||{});
+    else if(side) state.savedSnapshot.tpConfigs[side]=deepClone(state.tpConfigs[side]||{});
+  }
+  state.baselineLayers=deepClone(state.savedSnapshot.layers||[]);
+}
+function layerBindingRawAt(layers, layerIndex, keyIndex){
+  return ((layers||[])[layerIndex]?.bindings?.[keyIndex]?.raw||'').trim();
+}
+function isLayerBindingChanged(layerIndex, keyIndex){
+  const saved=state.savedSnapshot?.layers||[];
+  return layerBindingRawAt(state.layers, layerIndex, keyIndex)!==layerBindingRawAt(saved, layerIndex, keyIndex);
+}
+function isTdSlotChanged(index){ return stableJson(state.tdDefs?.[index]||tdEmpty())!==stableJson(state.savedSnapshot?.tdDefs?.[index]||tdEmpty()); }
+function isTdFieldChanged(index, field){
+  const cur=state.tdDefs?.[index]||tdEmpty();
+  const saved=state.savedSnapshot?.tdDefs?.[index]||tdEmpty();
+  return stableJson(cur[field])!==stableJson(saved[field]);
+}
+function isComboChanged(index){ return stableJson(state.combos?.[index]||null)!==stableJson(state.savedSnapshot?.combos?.[index]||null); }
+function isConditionalChanged(index){ return stableJson(state.conditionalLayers?.[index]||null)!==stableJson(state.savedSnapshot?.conditionalLayers?.[index]||null); }
+function isMacroChanged(slot){ return stableJson(state.macroDefs?.[slot]||macroEmpty(slot))!==stableJson(state.savedSnapshot?.macroDefs?.[slot]||macroEmpty(slot)); }
+function isMacroStepChanged(slot, stepIdx){ return stableJson(state.macroDefs?.[slot]?.steps?.[stepIdx]||null)!==stableJson(state.savedSnapshot?.macroDefs?.[slot]?.steps?.[stepIdx]||null); }
+function configValue(cfg, key){ return String((cfg||{})[key]??''); }
+function isConfigKeyChanged(side, key){
+  const current=side==='main' ? state.mainConfig : state.tpConfigs[side];
+  const saved=side==='main' ? state.savedSnapshot?.mainConfig : state.savedSnapshot?.tpConfigs?.[side];
+  return configValue(current,key)!==configValue(saved,key);
+}
+function configKeysForRow(row){
+  if(row.type==='rotate') return ['CONFIG_INPUT_IQS9151_ROTATE_0','CONFIG_INPUT_IQS9151_ROTATE_90','CONFIG_INPUT_IQS9151_ROTATE_180','CONFIG_INPUT_IQS9151_ROTATE_270'];
+  if(row.type==='swipeMode') return ['CONFIG_INPUT_IQS9151_2F_HORIZONTAL_NAV','CONFIG_INPUT_IQS9151_SCROLL_X_ENABLE'];
+  return row.key ? [row.key] : [];
+}
+function hasUnsavedChanges(){
+  if(!state.savedSnapshot) return false;
+  return stableJson(makeSavedSnapshot())!==stableJson(state.savedSnapshot);
+}
+function refreshUnsavedUi(){
+  state.unsaved=hasUnsavedChanges();
+  document.getElementById('unsaved-dot').classList.toggle('d-none',!state.unsaved);
+}
 function markUnsaved(){
-  state.unsaved=true;
-  document.getElementById('unsaved-dot').classList.remove('d-none');
+  refreshUnsavedUi();
   scheduleRealtimeDeviceWrite();
 }
-function markSaved(){ state.unsaved=false; document.getElementById('unsaved-dot').classList.add('d-none'); }
+function refreshChangedHighlights(){
+  if(state.layers.length){ renderKeyboard(); renderTpGestureKeys(); }
+  if(document.getElementById('tab-trackpad')?.classList.contains('active')) renderTpSettings();
+  if(document.getElementById('tab-general')?.classList.contains('active')) renderGeneralSettings();
+  renderModTapTab();
+  renderComboTab();
+  renderConditionalTab();
+  renderMacroTab();
+}
+function markSaved(){ resetSavedSnapshot('all'); refreshUnsavedUi(); refreshChangedHighlights(); }
+function markLayerBindingsWritten(){
+  resetSavedSnapshot('layers');
+  refreshUnsavedUi();
+  renderKeyboard();
+  renderTpGestureKeys();
+}
 function needsFollowUpPicker(raw){ return !!raw && raw.includes(MOD_PH); }
 function isModifierKeycode(name){
   return [
@@ -1878,6 +1952,8 @@ async function loadConfig(side){
   const data=await api(`/api/config/${side}`); if(data.error){ setStatus(data.error,'s-err'); return; }
   if(side==='main'){ state.mainConfig=data.config; if(document.getElementById('tab-general').classList.contains('active')) renderGeneralSettings(); }
   else { state.tpConfigs[side]=data.config; if(side===state.tpSide&&document.getElementById('tab-trackpad').classList.contains('active')) renderTpSettings(); }
+  resetSavedSnapshot('config',side);
+  refreshUnsavedUi();
 }
 
 // 笏笏 繧ｭ繝ｼ繝懊・繝画緒逕ｻ 笏笏
@@ -1905,6 +1981,7 @@ function renderKeyboard(){
     const label=bindingLabel(b.raw),cls=bindingClass(b.raw);
     const el=document.createElement('div');
     el.className=`key ${cls}`; el.dataset.idx=idx;
+    if(isLayerBindingChanged(state.currentLayer,idx)) el.classList.add('changed-outline');
     const mcTip=b.raw.match(MACRO_RE);
     const tdTip=b.raw.match(/^&td(\d+)$/);
     const layerTip=describeLayerBinding(b.raw);
@@ -2283,6 +2360,7 @@ function renderTdKeyBox(index, field, raw){
   const effectiveRaw=raw || '&none';
   const box=document.createElement('div'); box.className=`td-state-key ${bindingClass(effectiveRaw)}`;
   box.classList.toggle('pal-target',isPaletteTarget('td-cell',{index,field}));
+  box.classList.toggle('changed-outline',isTdFieldChanged(index,field));
   box.classList.toggle('empty',!raw);
   box.textContent=raw ? bindingLabel(raw) : '';
   box.title=raw || '&none';
@@ -2321,6 +2399,7 @@ function renderTdListPanel(){
     const isEmpty=![d.single_tap,d.single_hold,d.double_tap].some(Boolean);
     const li=document.createElement('div');
     li.className='td-list-item'+(state.tdSelectedSlot===i?' active':'');
+    if(isTdSlotChanged(i)) li.classList.add('changed-outline-inset');
     const lbl=document.createElement('span'); lbl.className='td-list-label'; lbl.textContent=`TD${i}`;
     const summ=document.createElement('span'); summ.className='td-list-summary';
     summ.textContent=isEmpty?'(未設定)':(d.display_name||[d.single_tap,d.single_hold,d.double_tap].filter(Boolean).join(' / '));
@@ -2347,6 +2426,7 @@ function renderTdDetailPanel(){
   const nameLbl=document.createElement('label'); nameLbl.style.cssText='font-size:11px;color:var(--dim);flex-shrink:0;white-space:nowrap;'; nameLbl.textContent='Name';
   const nameInp=document.createElement('input'); nameInp.type='text';
   nameInp.style.cssText='flex:1;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);padding:4px 7px;border-radius:3px;font-size:12px;';
+  if(isTdFieldChanged(i,'display_name')) nameInp.classList.add('changed-outline');
   nameInp.placeholder='Display name (shown on key)';
   nameInp.value=d.display_name||'';
   nameInp.oninput=()=>{ state.tdDefs[i]={...getTd(i),display_name:nameInp.value}; markUnsaved(); renderTdListPanel(); renderPalette(); };
@@ -2364,6 +2444,7 @@ function renderTdDetailPanel(){
   term.innerHTML='Tapping Term <input type="number" min="50" max="1000">';
   const inp=term.querySelector('input');
   inp.value=d.tapping_term||200;
+  if(isTdFieldChanged(i,'tapping_term')) inp.classList.add('changed-outline');
   inp.onchange=()=>{ state.tdDefs[i]={...getTd(i),tapping_term:parseInt(inp.value)||200}; markUnsaved(); };
   ft.appendChild(term);
   panel.appendChild(ft);
@@ -2451,6 +2532,7 @@ function renderComboTab(){
   }
   state.combos.forEach((combo,index)=>{
     const card=document.createElement('div'); card.className='combo-card';
+    if(isComboChanged(index)) card.classList.add('changed-outline');
 
     // ── ヘッダー: 名前 + 削除 ──
     const hdr=document.createElement('div'); hdr.className='combo-card-hdr';
@@ -2801,6 +2883,7 @@ function renderTpGestureKeys(){
     const lbl=document.createElement('span'); lbl.className='gest-label'; lbl.textContent=TP_GESTURE_LABELS[i]||`繧ｸ繧ｧ繧ｹ繝√Ε繝ｼ ${i+1}`;
     lbl.textContent=`${meta.slot}: ${meta.label}`;
     const keyEl=document.createElement('div'); keyEl.className=`gest-key ${bindingClass(b.raw)}`; keyEl.textContent=bindingLabel(b.raw); keyEl.title=b.raw;
+    if(isLayerBindingChanged(state.currentLayer,keyIdx)) keyEl.classList.add('changed-outline');
     item.appendChild(lbl); item.appendChild(keyEl);
     const applyGestureBinding=(raw)=>{
       setBinding(keyIdx,raw);
@@ -2896,6 +2979,7 @@ function copyTpSection(sect){
 function renderSettingsGrid(schema,cfgObj,cid){
   const container=document.getElementById(cid); container.innerHTML='';
   const isTP=cid==='tp-settings';
+  const configSide=isTP ? state.tpSide : 'main';
   schema.forEach(sect=>{
     const div=document.createElement('div'); div.className='sect';
     const hdr=document.createElement('div'); hdr.className='sect-hdr';
@@ -2904,6 +2988,7 @@ function renderSettingsGrid(schema,cfgObj,cid){
     div.appendChild(hdr);
     sect.rows.forEach(row=>{
       const r=document.createElement('div'); r.className='srow';
+      if(configKeysForRow(row).some(key=>isConfigKeyChanged(configSide,key))) r.classList.add('changed-outline-inset');
       const lbl=document.createElement('span'); lbl.className='slabel'; lbl.textContent=row.label; if(row.desc){lbl.classList.add('has-tip');lbl.title=row.desc;} r.appendChild(lbl);
       if(row.type==='bool'){ const lw=document.createElement('label'); lw.className='toggle'; const inp=document.createElement('input'); inp.type='checkbox'; inp.checked=cfgObj[row.key]==='y'; inp.onchange=()=>{ cfgObj[row.key]=inp.checked?'y':'n'; markUnsaved(); }; const sl=document.createElement('span'); sl.className='tsl'; lw.appendChild(inp); lw.appendChild(sl); r.appendChild(lw); }
       else if(row.type==='num'){ const inp=document.createElement('input'); inp.type='number'; inp.className='snum'; inp.value=cfgObj[row.key]||''; if(row.min!==undefined) inp.min=row.min; if(row.max!==undefined) inp.max=row.max; inp.oninput=()=>{ cfgObj[row.key]=inp.value; markUnsaved(); }; r.appendChild(inp); }
@@ -2945,6 +3030,7 @@ function renderConditionalTab(){
   }
   state.conditionalLayers.forEach((rule,index)=>{
     const card=document.createElement('div'); card.className='combo-card';
+    if(isConditionalChanged(index)) card.classList.add('changed-outline');
     const hdr=document.createElement('div'); hdr.className='combo-card-hdr';
     const nameInput=document.createElement('input');
     nameInput.value=rule.name||'';
@@ -3325,6 +3411,7 @@ function renderMacroList(){
     const m=getMacro(i);
     const li=document.createElement('div');
     li.className='macro-list-item'+(state.macroSelectedSlot===i?' active':'');
+    if(isMacroChanged(i)) li.classList.add('changed-outline-inset');
     li.innerHTML=`<span class="macro-list-label">mc${i}</span>`+
       `<span class="macro-list-name">${m.display_name||'(unnamed)'}</span>`;
     li.onclick=(()=>{const idx=i;return()=>{state.macroSelectedSlot=idx;renderMacroTab();};})();
@@ -3364,6 +3451,7 @@ function renderMacroStepRow(slot, stepIdx, step, pairMeta=null){
   const warnMsg=pairMeta?.warn||'';
   const row=document.createElement('div');
   row.className='macro-step';
+  if(isMacroStepChanged(slot,stepIdx)) row.classList.add('changed-outline');
   row.dataset.stepIdx=stepIdx;
   row.draggable=true;
   // 入力欄上でのマウスドラッグをステップ並び替えに吸われないようにする
@@ -3621,6 +3709,7 @@ function renderMacroStepEditor(slot){
   dnInp.type='text'; dnInp.className='macro-dn-inp';
   dnInp.placeholder='Display name (shown on key)';
   dnInp.value=macro.display_name||'';
+  if((state.savedSnapshot?.macroDefs?.[slot]?.display_name||'')!==(macro.display_name||'')) dnInp.classList.add('changed-outline');
   dnInp.oninput=()=>{
     state.macroDefs[slot].display_name=dnInp.value;
     markUnsaved();
@@ -4263,6 +4352,7 @@ async function writeDeviceNow(){
   }else{
     setStatus(`RPC keymap write complete (${result.changedCount} layer keys).`,'s-ok');
   }
+  markLayerBindingsWritten();
 }
 
 document.addEventListener('keydown',e=>{
