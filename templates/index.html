@@ -27,6 +27,8 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
 .btn{padding:5px 11px;border:1px solid var(--bdr2);border-radius:4px;background:var(--bg3);
   color:var(--text);cursor:pointer;font-size:12px;white-space:nowrap;transition:background .12s;}
 .btn:hover{background:var(--khov);}
+.btn:disabled{opacity:.45;cursor:not-allowed;}
+.btn:disabled:hover{background:var(--bg3);}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#06261f;}
 .btn.primary:hover{background:#7df4df;}
 .btn.blue{background:var(--a3);border-color:var(--a3);}
@@ -438,6 +440,7 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
     <span class="toolbar-label">Run</span>
     <button class="btn" id="connect-usb-btn" onclick="connectDevice('usb')" title="Open the USB serial picker and connect through ZMK Studio RPC.">Connect USB</button>
     <button class="btn" id="connect-ble-btn" onclick="connectDevice('ble')" title="Connect through Web Bluetooth and ZMK Studio RPC.">Connect Bluetooth</button>
+    <button class="btn" id="disconnect-btn" onclick="disconnectDevice()" title="Close the current MCU connection.">Disconnect</button>
     <button class="btn rpc" id="write-rpc-btn" onclick="writeDeviceNow()" title="Layer key bindings only. Uses ZMK Studio RPC and does not rebuild firmware.">Write keymap (RPC)</button>
     <button class="btn firmware" id="write-firmware-btn" onclick="writeFullFirmwareNow()" title="Save all, build firmware, then copy the generated UF2 to the bootloader drive.">Write firmware (UF2)</button>
   </div>
@@ -515,7 +518,6 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
         <span class="device-status" id="device-status">Disconnected</span>
       </div>
       <div class="device-row">
-        <button class="btn" onclick="disconnectDevice()">Disconnect</button>
         <button class="btn" onclick="testUsbSerialDialog()">Test USB Dialog</button>
         <label class="toggle" title="接続中のマイコンへキー割当の変更を短い待ち時間で反映します">
           <input type="checkbox" id="device-realtime" onchange="setDeviceRealtime(this.checked)">
@@ -4014,9 +4016,11 @@ function updateDevicePanel(){
   const transport=document.getElementById('device-transport');
   const label=document.getElementById('device-label');
   const rt=document.getElementById('device-realtime');
+  const disconnectBtn=document.getElementById('disconnect-btn');
   if(transport) transport.textContent=state.device.mode||'-';
   if(label) label.textContent=state.device.label||'-';
   if(rt) rt.checked=!!state.device.realtime;
+  if(disconnectBtn) disconnectBtn.disabled=!state.device.conn;
   refreshUsbDiag();
 }
 function setDeviceRealtime(value){
@@ -4543,6 +4547,15 @@ async function writeFullFirmwareNow(){
   if(!built) return;
   await flashFirmwareNow();
 }
+async function saveFilesBeforeDeviceWrite(){
+  const deviceBaseline=deepClone(state.baselineLayers||[]);
+  setStatus('Saving .keymap before RPC write...');
+  const saved=await saveAll({quiet:true,skipRealtime:true});
+  if(!saved) return false;
+  state.baselineLayers=deviceBaseline;
+  deviceLog('Saved editor files before RPC keymap write.');
+  return true;
+}
 async function writeDeviceNow(){
   if(!state.device.conn){
     setStatus('Connecting to MCU over USB...');
@@ -4550,6 +4563,8 @@ async function writeDeviceNow(){
     const connected=await connectDevice('usb');
     if(!connected) return;
   }
+  const saved=await saveFilesBeforeDeviceWrite();
+  if(!saved) return;
   setStatus('Writing layer keymap to MCU via RPC...');
   const result=await applyKeymapToDevice();
   if(result.error){
