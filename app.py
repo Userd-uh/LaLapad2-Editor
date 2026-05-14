@@ -115,16 +115,21 @@ MACRO_PAIR_ID_RE = re.compile(r'^[A-Za-z0-9_-]{1,64}$')
 # US配列 文字 → ZMK keycode
 _US_CHAR_MAP = {
     ' ': 'SPACE', '\t': 'TAB', '\n': 'ENTER', '\r': 'ENTER',
-    '0': 'N0', '1': 'N1', '2': 'N2', '3': 'N3', '4': 'N4',
-    '5': 'N5', '6': 'N6', '7': 'N7', '8': 'N8', '9': 'N9',
+    '0': 'NUMBER_0', '1': 'NUMBER_1', '2': 'NUMBER_2', '3': 'NUMBER_3', '4': 'NUMBER_4',
+    '5': 'NUMBER_5', '6': 'NUMBER_6', '7': 'NUMBER_7', '8': 'NUMBER_8', '9': 'NUMBER_9',
     '-': 'MINUS', '=': 'EQUAL', '[': 'LEFT_BRACKET', ']': 'RIGHT_BRACKET',
     '\\': 'BACKSLASH', ';': 'SEMI', "'": 'SQT', ',': 'COMMA', '.': 'PERIOD', '/': 'SLASH',
     '`': 'GRAVE',
-    '!': 'LS(N1)', '@': 'LS(N2)', '#': 'LS(N3)', '$': 'LS(N4)', '%': 'LS(N5)',
-    '^': 'LS(N6)', '&': 'LS(N7)', '*': 'LS(N8)', '(': 'LS(N9)', ')': 'LS(N0)',
+    '!': 'LS(NUMBER_1)', '@': 'LS(NUMBER_2)', '#': 'LS(NUMBER_3)', '$': 'LS(NUMBER_4)', '%': 'LS(NUMBER_5)',
+    '^': 'LS(NUMBER_6)', '&': 'LS(NUMBER_7)', '*': 'LS(NUMBER_8)', '(': 'LS(NUMBER_9)', ')': 'LS(NUMBER_0)',
     '_': 'LS(MINUS)', '+': 'LS(EQUAL)', '{': 'LS(LEFT_BRACKET)', '}': 'LS(RIGHT_BRACKET)',
     '|': 'LS(BACKSLASH)', ':': 'LS(SEMI)', '"': 'LS(SQT)', '<': 'LS(COMMA)',
     '>': 'LS(PERIOD)', '?': 'LS(SLASH)', '~': 'LS(GRAVE)',
+    '！': 'LS(NUMBER_1)', '＠': 'LS(NUMBER_2)', '＃': 'LS(NUMBER_3)', '＄': 'LS(NUMBER_4)',
+    '％': 'LS(NUMBER_5)', '＾': 'LS(NUMBER_6)', '＆': 'LS(NUMBER_7)', '＊': 'LS(NUMBER_8)',
+    '（': 'LS(NUMBER_9)', '）': 'LS(NUMBER_0)', '＿': 'LS(MINUS)', '＋': 'LS(EQUAL)',
+    '｛': 'LS(LEFT_BRACKET)', '｝': 'LS(RIGHT_BRACKET)', '｜': 'LS(BACKSLASH)', '：': 'LS(SEMI)',
+    '”': 'LS(SQT)', '＜': 'LS(COMMA)', '＞': 'LS(PERIOD)', '？': 'LS(SLASH)', '～': 'LS(GRAVE)',
     **{c: c.upper() for c in 'abcdefghijklmnopqrstuvwxyz'},
     **{c: f'LS({c})' for c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'},
 }
@@ -1598,6 +1603,29 @@ def api_keymap():
         s2.setdefault('per_folder_macros', {})[folder2] = s2['macro_definitions']
     save_settings_file(s2)
     return jsonify({'ok': True, 'td_module': td_module_status})
+
+
+@app.route('/api/keymap/export', methods=['POST'])
+def api_keymap_export():
+    s = load_settings()
+    path = norm(s.get('keymap_path', ''))
+    if not path or not os.path.exists(path):
+        return jsonify({'error': 'キーマップパスが無効'}), 400
+    try:
+        original = _read_text_file(path)
+        payload = request.json or {}
+        content = update_keymap(
+            original,
+            payload.get('layers', []),
+            payload.get('combos', []),
+            payload.get('td_definitions', s.get('td_definitions', [])),
+            payload.get('conditional_layers', []),
+            payload.get('macro_definitions', s.get('macro_definitions', [])),
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    name = os.path.basename(path) or 'keymap.keymap'
+    return jsonify({'ok': True, 'filename': name, 'content': content})
 
 
 @app.route('/api/config/<side>', methods=['GET', 'POST'])

@@ -441,7 +441,9 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
     <button class="btn" id="connect-usb-btn" onclick="connectDevice('usb')" title="Open the USB serial picker and connect through ZMK Studio RPC.">Connect USB</button>
     <button class="btn" id="connect-ble-btn" onclick="connectDevice('ble')" title="Connect through Web Bluetooth and ZMK Studio RPC.">Connect Bluetooth</button>
     <button class="btn" id="disconnect-btn" onclick="disconnectDevice()" title="Close the current MCU connection.">Disconnect</button>
-    <button class="btn rpc" id="write-rpc-btn" onclick="writeDeviceNow()" title="Layer key bindings only. Uses ZMK Studio RPC and does not rebuild firmware.">Write keymap (RPC)</button>
+    <button class="btn" id="load-device-btn" onclick="loadKeymapFromDevice()" title="Read the connected MCU keymap through ZMK Studio RPC and show it in the editor.">Load from MCU</button>
+    <button class="btn" id="export-keymap-btn" onclick="exportDisplayedKeymap()" title="Export the keymap currently shown in the editor.">Export keymap</button>
+    <button class="btn rpc" id="write-rpc-btn" onclick="writeDeviceNow()" title="Writes the layer key bindings currently shown in the editor. Uses ZMK Studio RPC and does not rebuild firmware.">Write keymap (RPC)</button>
     <button class="btn firmware" id="write-firmware-btn" onclick="writeFullFirmwareNow()" title="Save all, build firmware, then copy the generated UF2 to the bootloader drive.">Write firmware (UF2)</button>
   </div>
   <span class="unsaved d-none" id="unsaved-dot" title="Unsaved changes">*</span>
@@ -528,11 +530,13 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
       <div class="device-kv" style="margin-top:10px">
         <b>Transport</b><span id="device-transport">-</span>
         <b>Device</b><span id="device-label">-</span>
-        <b>Write keymap (RPC)</b><span id="device-writable">Layer key bindings only. Does not rebuild or replace firmware.</span>
+        <b>Load from MCU</b><span>Reads layer key bindings from the connected device and replaces the editor display. Driver/.conf settings remain file-based.</span>
+        <b>Export keymap</b><span>Downloads the keymap currently shown in the editor without changing files or the MCU.</span>
+        <b>Write keymap (RPC)</b><span id="device-writable">Writes the layer key bindings currently shown in the editor. Does not rebuild or replace firmware.</span>
         <b>Write firmware (UF2)</b><span>Full firmware replacement: Save All, build, then copy UF2. Includes tap dance, macro, combo, conditional layers, and .conf/Kconfig changes.</span>
       </div>
       <p class="device-note" style="margin-top:10px">
-        ヘッダーの MCU 操作は実行ボタンです。Write keymap (RPC) はレイヤーのキー割当だけをZMK Studio RPCで即時反映します。Write firmware (UF2) はファームウェア全体を書き換える操作です。
+        ヘッダーの MCU 操作は実行ボタンです。Load from MCU / Write keymap (RPC) はレイヤーのキー割当だけをZMK Studio RPCで読み書きします。トラックパッドやドライバー設定などの .conf/Kconfig 情報はファイル保存 + firmware 書き込みの対象です。
       </p>
       <div class="firmware-grid">
         <label>Build command</label>
@@ -830,6 +834,29 @@ const KN={
   K_MENU:'Menu',
   LANGUAGE_1:'日',LANGUAGE_2:'英',
 };
+const SHIFTED_KEY_LABELS={
+  'LS(GRAVE)':'~','LS(N1)':'!','LS(NUMBER_1)':'!','LS(N2)':'@','LS(NUMBER_2)':'@',
+  'LS(N3)':'#','LS(NUMBER_3)':'#','LS(N4)':'$','LS(NUMBER_4)':'$',
+  'LS(N5)':'%','LS(NUMBER_5)':'%','LS(N6)':'^','LS(NUMBER_6)':'^',
+  'LS(N7)':'&','LS(NUMBER_7)':'&','LS(N8)':'*','LS(NUMBER_8)':'*',
+  'LS(N9)':'(','LS(NUMBER_9)':'(','LS(N0)':')','LS(NUMBER_0)':')',
+  'LS(MINUS)':'_','LS(EQUAL)':'+','LS(LEFT_BRACKET)':'{','LS(RIGHT_BRACKET)':'}',
+  'LS(BACKSLASH)':'|','LS(SEMI)':':','LS(SQT)':'"','LS(COMMA)':'<',
+  'LS(PERIOD)':'>','LS(SLASH)':'?',
+};
+const SHIFTED_KEY_ALIASES={
+  TILDE:'LS(GRAVE)',EXCL:'LS(NUMBER_1)',AT:'LS(NUMBER_2)',HASH:'LS(NUMBER_3)',DLLR:'LS(NUMBER_4)',DOLLAR:'LS(NUMBER_4)',
+  PRCNT:'LS(NUMBER_5)',PERCENT:'LS(NUMBER_5)',CARET:'LS(NUMBER_6)',AMPS:'LS(NUMBER_7)',AMPERSAND:'LS(NUMBER_7)',
+  ASTRK:'LS(NUMBER_8)',ASTERISK:'LS(NUMBER_8)',LPAR:'LS(NUMBER_9)',RPAR:'LS(NUMBER_0)',UNDER:'LS(MINUS)',
+  PLUS:'LS(EQUAL)',LBRC:'LS(LEFT_BRACKET)',RBRC:'LS(RIGHT_BRACKET)',PIPE:'LS(BACKSLASH)',
+  COLON:'LS(SEMI)',DQT:'LS(SQT)',DOUBLE_QUOTES:'LS(SQT)',LT:'LS(COMMA)',GT:'LS(PERIOD)',
+  QMARK:'LS(SLASH)',
+  '！':'LS(NUMBER_1)','＠':'LS(NUMBER_2)','＃':'LS(NUMBER_3)','＄':'LS(NUMBER_4)',
+  '％':'LS(NUMBER_5)','＾':'LS(NUMBER_6)','＆':'LS(NUMBER_7)','＊':'LS(NUMBER_8)',
+  '（':'LS(NUMBER_9)','）':'LS(NUMBER_0)','＿':'LS(MINUS)','＋':'LS(EQUAL)',
+  '｛':'LS(LEFT_BRACKET)','｝':'LS(RIGHT_BRACKET)','｜':'LS(BACKSLASH)','：':'LS(SEMI)',
+  '”':'LS(SQT)','＜':'LS(COMMA)','＞':'LS(PERIOD)','？':'LS(SLASH)','～':'LS(GRAVE)',
+};
 const MOD_EXPR_LABELS={
   LEFT_SHIFT:'LSft',RIGHT_SHIFT:'RSft',LEFT_CONTROL:'LCtl',RIGHT_CONTROL:'RCtl',
   LEFT_ALT:'LAlt',RIGHT_ALT:'RAlt',LEFT_GUI:'LGui',RIGHT_GUI:'RGui',
@@ -855,6 +882,8 @@ const MOD_EXPR_LABELS={
 function shortKeyLabel(k){
   if(!k) return '?';
   const m=k.match(/^([LR][GCAS])\((.+)\)$/);
+  if(SHIFTED_KEY_LABELS[k]) return SHIFTED_KEY_LABELS[k];
+  if(SHIFTED_KEY_ALIASES[k]) return SHIFTED_KEY_LABELS[SHIFTED_KEY_ALIASES[k]] || SHIFTED_KEY_ALIASES[k];
   if(m) return `${m[1]}(${shortKeyLabel(m[2])})`;
   if(k in KN) return KN[k];
   if(MOD_EXPR_LABELS[k]) return MOD_EXPR_LABELS[k];
@@ -1090,30 +1119,30 @@ const QWERTY_ROWS=[
     {r:'&kp PRINTSCREEN',l:'Print\nScreen',w:'w13'},{r:'&kp SCROLLLOCK',l:'Scroll\nLock',w:'w13'},{r:'&kp PAUSE_BREAK',l:'Pause',w:'w13'}
   ],
   [
-    palItem('&kp GRAVE','~\n`'),palItem('&kp NUMBER_1','!\n1'),palItem('&kp NUMBER_2','@\n2'),palItem('&kp NUMBER_3','#\n3'),
-    palItem('&kp NUMBER_4','$\n4'),palItem('&kp NUMBER_5','%\n5'),palItem('&kp NUMBER_6','^\n6'),palItem('&kp NUMBER_7','&\n7'),
-    palItem('&kp NUMBER_8','*\n8'),palItem('&kp NUMBER_9','(\n9'),palItem('&kp NUMBER_0',')\n0'),palItem('&kp MINUS','_\n-'),
-    palItem('&kp EQUAL','+\n='),{r:'&kp BACKSPACE',l:'Bksp',w:'w_bksp',title:'Backspace'},gap(28),
+    palItem('&kp GRAVE','`'),palItem('&kp NUMBER_1','1'),palItem('&kp NUMBER_2','2'),palItem('&kp NUMBER_3','3'),
+    palItem('&kp NUMBER_4','4'),palItem('&kp NUMBER_5','5'),palItem('&kp NUMBER_6','6'),palItem('&kp NUMBER_7','7'),
+    palItem('&kp NUMBER_8','8'),palItem('&kp NUMBER_9','9'),palItem('&kp NUMBER_0','0'),palItem('&kp MINUS','-'),
+    palItem('&kp EQUAL','='),{r:'&kp BACKSPACE',l:'Bksp',w:'w_bksp',title:'Backspace'},gap(28),
     {r:'&kp INSERT',l:'Insert',w:'w13'},{r:'&kp HOME',l:'Home',w:'w13'},{r:'&kp PAGE_UP',l:'Page\nUp',w:'w13'},gap(28),
     {r:'&kp KP_NUMLOCK',l:'Num\nLock',w:'w13'},{r:'&kp KP_DIVIDE',l:'/',w:'w13'},{r:'&kp KP_ASTERISK',l:'*',w:'w13'},{r:'&kp KP_MINUS',l:'-',w:'w13'}
   ],
   [
     {r:'&kp TAB',l:'Tab',w:'w_tab',title:'Tab'},palItem('&kp Q','Q'),palItem('&kp W','W'),palItem('&kp E','E'),palItem('&kp R','R'),
     palItem('&kp T','T'),palItem('&kp Y','Y'),palItem('&kp U','U'),palItem('&kp I','I'),palItem('&kp O','O'),palItem('&kp P','P'),
-    palItem('&kp LEFT_BRACKET','{\n['),palItem('&kp RIGHT_BRACKET','}\n]'),palItem('&kp BACKSLASH','|\n\\'),gap(28),
+    palItem('&kp LEFT_BRACKET','['),palItem('&kp RIGHT_BRACKET',']'),palItem('&kp BACKSLASH','\\'),gap(28),
     {r:'&kp DELETE',l:'Del',w:'w13'},{r:'&kp END',l:'End',w:'w13'},{r:'&kp PAGE_DOWN',l:'Page\nDown',w:'w13'},gap(28),
     {r:'&kp KP_NUMBER_7',l:'7',w:'w13'},{r:'&kp KP_NUMBER_8',l:'8',w:'w13'},{r:'&kp KP_NUMBER_9',l:'9',w:'w13'},{r:'&kp KP_PLUS',l:'+',w:'w13'}
   ],
   [
     {r:'&kp CAPS',l:'Caps\nLock',w:'w_caps',title:'Caps Lock'},palItem('&kp A','A'),palItem('&kp S','S'),palItem('&kp D','D'),palItem('&kp F','F'),
-    palItem('&kp G','G'),palItem('&kp H','H'),palItem('&kp J','J'),palItem('&kp K','K'),palItem('&kp L','L'),palItem('&kp SEMI',':\n;'),
-    palItem('&kp SQT','"\n\''),{r:'&kp ENTER',l:'Enter',w:'w_enter',title:'Enter'},gap(212),
+    palItem('&kp G','G'),palItem('&kp H','H'),palItem('&kp J','J'),palItem('&kp K','K'),palItem('&kp L','L'),palItem('&kp SEMI',';'),
+    palItem('&kp SQT',"'"),{r:'&kp ENTER',l:'Enter',w:'w_enter',title:'Enter'},gap(212),
     {r:'&kp KP_NUMBER_4',l:'4',w:'w13'},{r:'&kp KP_NUMBER_5',l:'5',w:'w13'},{r:'&kp KP_NUMBER_6',l:'6',w:'w13'},{r:'&kp KP_COMMA',l:',',w:'w13'}
   ],
   [
     {r:'&kp LEFT_SHIFT',l:'LShift',w:'w_lshift',title:'Left Shift'},palItem('&kp Z','Z'),palItem('&kp X','X'),palItem('&kp C','C'),palItem('&kp V','V'),
-    palItem('&kp B','B'),palItem('&kp N','N'),palItem('&kp M','M'),palItem('&kp COMMA','<\n,'),palItem('&kp PERIOD','>\n.'),
-    palItem('&kp SLASH','?\n/'),{r:'&kp RIGHT_SHIFT',l:'RShift',w:'w_lrsh',title:'Right Shift'},gap(79),
+    palItem('&kp B','B'),palItem('&kp N','N'),palItem('&kp M','M'),palItem('&kp COMMA',','),palItem('&kp PERIOD','.'),
+    palItem('&kp SLASH','/'),{r:'&kp RIGHT_SHIFT',l:'RShift',w:'w_lrsh',title:'Right Shift'},gap(79),
     {r:'&kp UP',l:'Up',w:'w13'},gap(79),
     {r:'&kp KP_NUMBER_1',l:'1',w:'w13'},{r:'&kp KP_NUMBER_2',l:'2',w:'w13'},{r:'&kp KP_NUMBER_3',l:'3',w:'w13'},{r:'&kp KP_EQUAL',l:'=',w:'w13'}
   ],
@@ -1127,11 +1156,11 @@ const QWERTY_ROWS=[
   [
     {r:'&none',l:'',title:'No output'},
     {r:'&trans',l:'▽'},
-    palItem('&kp TILDE','~'),palItem('&kp EXCL','!'),palItem('&kp AT','@'),palItem('&kp HASH','#'),
-    palItem('&kp DLLR','$'),palItem('&kp PRCNT','%'),palItem('&kp CARET','^'),palItem('&kp AMPS','&'),
-    palItem('&kp ASTRK','*'),palItem('&kp LPAR','('),palItem('&kp RPAR',')'),palItem('&kp UNDER','_'),
-    palItem('&kp PLUS','+'),palItem('&kp LBRC','{'),palItem('&kp RBRC','}'),palItem('&kp LT','<'),
-    palItem('&kp GT','>'),palItem('&kp COLON',':'),palItem('&kp PIPE','|'),palItem('&kp QMARK','?'),palItem('&kp DQT','"'),
+    palItem('&kp LS(GRAVE)','~'),palItem('&kp LS(NUMBER_1)','!'),palItem('&kp LS(NUMBER_2)','@'),palItem('&kp LS(NUMBER_3)','#'),
+    palItem('&kp LS(NUMBER_4)','$'),palItem('&kp LS(NUMBER_5)','%'),palItem('&kp LS(NUMBER_6)','^'),palItem('&kp LS(NUMBER_7)','&'),
+    palItem('&kp LS(NUMBER_8)','*'),palItem('&kp LS(NUMBER_9)','('),palItem('&kp LS(NUMBER_0)',')'),palItem('&kp LS(MINUS)','_'),
+    palItem('&kp LS(EQUAL)','+'),palItem('&kp LS(LEFT_BRACKET)','{'),palItem('&kp LS(RIGHT_BRACKET)','}'),palItem('&kp LS(COMMA)','<'),
+    palItem('&kp LS(PERIOD)','>'),palItem('&kp LS(SEMI)',':'),palItem('&kp LS(BACKSLASH)','|'),palItem('&kp LS(SLASH)','?'),palItem('&kp LS(SQT)','"'),
     palItem('&kp LANGUAGE_1','Lang\n1'),palItem('&kp LANGUAGE_2','Lang\n2')
   ],
 ];
@@ -2022,20 +2051,53 @@ async function loadKeymap(){
   setStatus('Loading...');
   const data=await api('/api/keymap');
   if(data.error){ setStatus(data.error,'s-err'); document.getElementById('file-status').textContent=data.error; return; }
-  state.layers=data.layers; state.currentLayer=0;
-  state.baselineLayers=deepClone(data.layers||[]);
   state.combos=data.combos||[];
   state.conditionalLayers=data.conditional_layers||[];
   state.tdDefs=data.td_definitions||state.tdDefs;
   if(data.macro_definitions) state.macroDefs=hydrateMacroDefs(data.macro_definitions);
   injectCustomPalette(data.custom_bindings||[]);
-  markSaved();
-  document.getElementById('file-status').textContent=data.path;
+  applyDisplayedKeymap(data.layers||[], {
+    sourceLabel:data.path,
+    statusText:'Loaded',
+    statusClass:'s-ok',
+    markAsSaved:true,
+  });
+}
+function applyDisplayedKeymap(layers, opts={}){
+  state.layers=deepClone(layers||[]);
+  state.currentLayer=0;
+  state.baselineLayers=deepClone(state.layers);
+  if(opts.markAsSaved!==false) resetSavedSnapshot('all');
+  refreshUnsavedUi();
+  document.getElementById('file-status').textContent=opts.sourceLabel||'Displayed keymap';
   document.getElementById('status-info').textContent=`${state.layers.length} layers / ${(state.layers[0]?.bindings||[]).length} keys`;
-  document.getElementById('no-data-box').classList.add('d-none');
-  document.getElementById('keyboard').classList.remove('d-none');
+  document.getElementById('no-data-box').classList.toggle('d-none',!!state.layers.length);
+  document.getElementById('keyboard').classList.toggle('d-none',!state.layers.length);
   renderLayerBtns(); renderKeyboard(); renderPalette(); renderTpGestureKeys(); renderModTapTab(); renderComboTab(); renderConditionalTab(); renderMacroTab();
-  setStatus('Loaded','s-ok');
+  if(opts.statusText) setStatus(opts.statusText,opts.statusClass||'');
+}
+async function exportDisplayedKeymap(){
+  if(!state.layers.length){ setStatus('Export error: keymap is not loaded.','s-err'); return; }
+  const res=await api('/api/keymap/export','POST',{
+    layers:state.layers,
+    combos:state.combos,
+    td_definitions:state.tdDefs,
+    conditional_layers:state.conditionalLayers,
+    macro_definitions:state.macroDefs,
+  });
+  if(res.error){ setStatus('Export error: '+res.error,'s-err'); return; }
+  const blob=new Blob([res.content||''],{type:'text/plain;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const stamp=new Date().toISOString().replace(/[:.]/g,'-');
+  const base=(res.filename||'keymap.keymap').replace(/\.keymap$/,'');
+  a.href=url;
+  a.download=`${base}-export-${stamp}.keymap`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  setStatus('Exported displayed keymap.','s-ok');
 }
 async function loadConfig(side){
   const data=await api(`/api/config/${side}`); if(data.error){ setStatus(data.error,'s-err'); return; }
@@ -3253,15 +3315,20 @@ function switchTpSide(side){
 // ===== MACRO TAB =====
 const US_CHAR_MAP = {
   ' ': 'SPACE', '\t': 'TAB', '\n': 'ENTER', '\r': 'ENTER',
-  '0':'N0','1':'N1','2':'N2','3':'N3','4':'N4',
-  '5':'N5','6':'N6','7':'N7','8':'N8','9':'N9',
+  '0':'NUMBER_0','1':'NUMBER_1','2':'NUMBER_2','3':'NUMBER_3','4':'NUMBER_4',
+  '5':'NUMBER_5','6':'NUMBER_6','7':'NUMBER_7','8':'NUMBER_8','9':'NUMBER_9',
   '-':'MINUS','=':'EQUAL','[':'LEFT_BRACKET',']':'RIGHT_BRACKET',
   '\\':'BACKSLASH',';':'SEMI',"'":'SQT',',':'COMMA','.':'PERIOD','/':'SLASH','`':'GRAVE',
-  '!':'LS(N1)','@':'LS(N2)','#':'LS(N3)','$':'LS(N4)','%':'LS(N5)',
-  '^':'LS(N6)','&':'LS(N7)','*':'LS(N8)','(':'LS(N9)',')':'LS(N0)',
+  '!':'LS(NUMBER_1)','@':'LS(NUMBER_2)','#':'LS(NUMBER_3)','$':'LS(NUMBER_4)','%':'LS(NUMBER_5)',
+  '^':'LS(NUMBER_6)','&':'LS(NUMBER_7)','*':'LS(NUMBER_8)','(':'LS(NUMBER_9)',')':'LS(NUMBER_0)',
   '_':'LS(MINUS)','+':'LS(EQUAL)','{':'LS(LEFT_BRACKET)','}':'LS(RIGHT_BRACKET)',
   '|':'LS(BACKSLASH)',':':'LS(SEMI)','"':'LS(SQT)','<':'LS(COMMA)','>':'LS(PERIOD)',
   '?':'LS(SLASH)','~':'LS(GRAVE)',
+  '！':'LS(NUMBER_1)','＠':'LS(NUMBER_2)','＃':'LS(NUMBER_3)','＄':'LS(NUMBER_4)',
+  '％':'LS(NUMBER_5)','＾':'LS(NUMBER_6)','＆':'LS(NUMBER_7)','＊':'LS(NUMBER_8)',
+  '（':'LS(NUMBER_9)','）':'LS(NUMBER_0)','＿':'LS(MINUS)','＋':'LS(EQUAL)',
+  '｛':'LS(LEFT_BRACKET)','｝':'LS(RIGHT_BRACKET)','｜':'LS(BACKSLASH)','：':'LS(SEMI)',
+  '”':'LS(SQT)','＜':'LS(COMMA)','＞':'LS(PERIOD)','？':'LS(SLASH)','～':'LS(GRAVE)',
   ...Object.fromEntries('abcdefghijklmnopqrstuvwxyz'.split('').map(c=>[c,c.toUpperCase()])),
   ...Object.fromEntries('ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(c=>[c,'LS('+c+')'])),
 };
@@ -4156,7 +4223,7 @@ async function connectDevice(mode){
     setDeviceStatus('Connected','ok');
     updateDevicePanel();
     deviceLog(`Connected: ${name}`);
-    deviceLog('Device keymap loaded. Use Write keymap (RPC) to push changed layer bindings only.');
+    deviceLog('Device keymap is available. Use Load from MCU to show it in the editor, or Write keymap (RPC) to push the displayed layer bindings.');
     return true;
   }catch(e){
     if(transport){
@@ -4170,6 +4237,44 @@ async function connectDevice(mode){
     deviceLog(`Connection failed: ${msg}`);
     setStatus('MCU connection error: '+msg,'s-err');
     return false;
+  }
+}
+async function loadKeymapFromDevice(){
+  if(!state.device.conn){
+    setStatus('Connecting to MCU over USB...');
+    deviceLog('No active MCU connection. Opening USB serial picker before device keymap load...');
+    const connected=await connectDevice('usb');
+    if(!connected) return;
+  }
+  try{
+    setStatus('Reading keymap from MCU...');
+    const latest=await callDeviceRpc({keymap:{getKeymap:true}},8000);
+    const remoteKeymap=latest.keymap?.getKeymap;
+    if(!remoteKeymap?.layers?.length){
+      setStatus('Device keymap could not be read.','s-err');
+      deviceLog('Device keymap read returned no layers.');
+      return;
+    }
+    await loadDeviceBehaviors();
+    const rawMap=buildRawBindingMap(state.layers?.length ? state.layers : state.baselineLayers,remoteKeymap);
+    rawMap.remoteKeymap=remoteKeymap;
+    state.device.keymap=remoteKeymap;
+    const layers=layersFromDeviceKeymap(remoteKeymap,rawMap);
+    applyDisplayedKeymap(layers,{
+      sourceLabel:`MCU: ${state.device.label||'ZMK device'}`,
+      statusText:'Loaded keymap from MCU.',
+      statusClass:'s-ok',
+      markAsSaved:true,
+    });
+    const unknown=layers.reduce((count,layer)=>count+(layer.bindings||[]).filter(b=>/^&behavior_\d+/.test(b.raw||'')).length,0);
+    deviceLog(`Loaded ${layers.length} layers from MCU into the editor${unknown?`; ${unknown} bindings are shown as behavior_id placeholders`:''}.`);
+    if(unknown){
+      setStatus(`Loaded keymap from MCU. ${unknown} bindings need behavior mapping before file export/RPC rewrite.`, 's-warn');
+    }
+  }catch(e){
+    const msg=e?.message||String(e);
+    setStatus('Device keymap load error: '+msg,'s-err');
+    deviceLog('Device keymap load error: '+msg);
   }
 }
 async function disconnectDevice(){
@@ -4246,11 +4351,46 @@ const HID_KEYBOARD_USAGE={
   LCTRL:0xe0,LSHIFT:0xe1,LALT:0xe2,LGUI:0xe3,RCTRL:0xe4,RSHIFT:0xe5,RALT:0xe6,RGUI:0xe7,
   LWIN:0xe3,RWIN:0xe7,
 };
+const HID_USAGE_KEYCODE=new Map(Object.entries(HID_KEYBOARD_USAGE).map(([name,usage])=>[usage,name]));
+const HID_USAGE_MODIFIERS={
+  LC:0x01,LCTRL:0x01,LEFT_CONTROL:0x01,
+  LS:0x02,LSHIFT:0x02,LEFT_SHIFT:0x02,
+  LA:0x04,LALT:0x04,LEFT_ALT:0x04,
+  LG:0x08,LGUI:0x08,LWIN:0x08,LEFT_GUI:0x08,
+  RC:0x10,RCTRL:0x10,RIGHT_CONTROL:0x10,
+  RS:0x20,RSHIFT:0x20,RIGHT_SHIFT:0x20,
+  RA:0x40,RALT:0x40,RIGHT_ALT:0x40,
+  RG:0x80,RGUI:0x80,RWIN:0x80,RIGHT_GUI:0x80,
+};
+const HID_MODIFIER_LABELS=[
+  [0x01,'LC'],[0x02,'LS'],[0x04,'LA'],[0x08,'LG'],
+  [0x10,'RC'],[0x20,'RS'],[0x40,'RA'],[0x80,'RG'],
+];
+function normalizeKeycodeToken(token){
+  let key=(token||'').trim().toUpperCase();
+  return SHIFTED_KEY_ALIASES[key] || key;
+}
 function keycodeToHidUsage(token){
-  const key=(token||'').trim().toUpperCase();
+  let key=normalizeKeycodeToken(token);
   if(!key) return null;
+  const modMatch=key.match(/^([LR][CSAG]|LCTRL|LSHIFT|LALT|LGUI|LWIN|RCTRL|RSHIFT|RALT|RGUI|RWIN|LEFT_(?:CONTROL|SHIFT|ALT|GUI)|RIGHT_(?:CONTROL|SHIFT|ALT|GUI))\((.+)\)$/);
+  if(modMatch){
+    const mod=HID_USAGE_MODIFIERS[modMatch[1]];
+    const inner=keycodeToHidUsage(modMatch[2]);
+    if(mod===undefined || inner===null) return null;
+    return inner | (mod << 24);
+  }
   if(Object.prototype.hasOwnProperty.call(HID_KEYBOARD_USAGE,key)) return HID_KEYBOARD_PAGE + HID_KEYBOARD_USAGE[key];
   return null;
+}
+function hidUsageToKeycode(value){
+  const base=hidUsageBase(value);
+  const page=base>>>16;
+  if(page!==0x07) return '';
+  let key=HID_USAGE_KEYCODE.get(base & 0xffff) || '';
+  const mods=(Number(value)||0) >>> 24;
+  HID_MODIFIER_LABELS.forEach(([flag,label])=>{ if(key && (mods & flag)) key=`${label}(${key})`; });
+  return key;
 }
 function hidUsageBase(value){
   return (Number(value)||0) & 0x00ffffff;
@@ -4337,6 +4477,21 @@ function buildRawBindingMap(localLayers, remoteKeymap){
   conflicts.forEach(raw=>map.delete(raw));
   return {rawMap:map,behaviorIdsByLabel};
 }
+function behaviorLabelById(rawMap){
+  const labels=new Map();
+  (rawMap.behaviorIdsByLabel||new Map()).forEach((id,label)=>{
+    if(id!==undefined && id!==null && !labels.has(id)) labels.set(id,label);
+  });
+  Object.values(state.device.behaviors||{}).forEach(details=>{
+    const alias=aliasForDeviceBehavior(details);
+    if(alias && details?.id!==undefined && !labels.has(details.id)) labels.set(details.id,alias);
+  });
+  return labels;
+}
+function layerIdToIndex(remoteKeymap, layerId){
+  const index=(remoteKeymap?.layers||[]).findIndex(layer=>layer?.id===layerId);
+  return index>=0 ? index : null;
+}
 function layerIndexToDeviceId(remoteKeymap, value){
   const index=Number(value);
   if(Number.isInteger(index) && remoteKeymap?.layers?.[index]?.id!==undefined) return remoteKeymap.layers[index].id;
@@ -4344,7 +4499,10 @@ function layerIndexToDeviceId(remoteKeymap, value){
 }
 function bindingFromParsedRaw(parsed, behaviorIdsByLabel, remoteKeymap){
   if(!parsed) return null;
-  if(parsed.label==='none'||parsed.label==='trans') return {behaviorId,param1:0,param2:0};
+  if(parsed.label==='none'||parsed.label==='trans'){
+    const behaviorId=behaviorIdsByLabel.get(parsed.label);
+    return behaviorId===undefined ? null : {behaviorId,param1:0,param2:0};
+  }
   if(parsed.label==='kp'){
     const behaviorId=behaviorIdsByLabel.get('kp') ?? inferKeyboardBehaviorIdFromRemote(remoteKeymap);
     if(behaviorId===undefined) return null;
@@ -4367,6 +4525,48 @@ function bindingFromParsedRaw(parsed, behaviorIdsByLabel, remoteKeymap){
     if(layerId!==null) return {behaviorId,param1:layerId,param2:0};
   }
   return null;
+}
+function deviceBindingToRaw(binding, rawMap, layerIndex, keyPosition){
+  if(!binding) return '&none';
+  const localRaw=(state.baselineLayers?.[layerIndex]?.bindings?.[keyPosition]?.raw||'').trim();
+  if(localRaw){
+    const mapped=rawMap.rawMap.get(localRaw);
+    if(mapped && bindingKey(mapped)===bindingKey(binding)) return localRaw;
+  }
+  for(const [raw,mapped] of rawMap.rawMap.entries()){
+    if(bindingKey(mapped)===bindingKey(binding)) return raw;
+  }
+  const labels=behaviorLabelById(rawMap);
+  const label=labels.get(binding.behaviorId);
+  const p1=Number(binding.param1)||0;
+  const p2=Number(binding.param2)||0;
+  if(label==='none'||label==='trans') return `&${label}`;
+  if(label==='kp'){
+    const key=hidUsageToKeycode(p1);
+    return key ? `&kp ${key}` : `&kp 0x${p1.toString(16)}`;
+  }
+  if(label==='mt'||label==='mt2'){
+    const hold=hidUsageToKeycode(p1);
+    const tap=hidUsageToKeycode(p2);
+    if(hold&&tap) return `&${label} ${hold} ${tap}`;
+  }
+  if(['mo','to','tog'].includes(label)){
+    const index=layerIdToIndex(rawMap.remoteKeymap,p1);
+    if(index!==null) return `&${label} ${index}`;
+  }
+  if(label) return `&${label} ${p1} ${p2}`.trim();
+  return `&behavior_${binding.behaviorId} ${p1} ${p2}`.trim();
+}
+function layersFromDeviceKeymap(remoteKeymap, rawMap){
+  return (remoteKeymap?.layers||[]).map((layer,li)=>{
+    const local=state.layers?.[li]||state.baselineLayers?.[li]||{};
+    const name=layer.displayName||layer.display_name||layer.name||local.display_name||`Layer ${li}`;
+    return {
+      name:local.name||`layer_${li}`,
+      display_name:name,
+      bindings:(layer.bindings||[]).map((binding,ki)=>({raw:deviceBindingToRaw(binding,rawMap,li,ki)})),
+    };
+  });
 }
 function inferKeyboardBehaviorIdFromRemote(remoteKeymap){
   const counts=new Map();
@@ -4429,6 +4629,26 @@ function collectLayerBindingChanges(rawMap){
   });
   return {changes,unsupported};
 }
+function collectDisplayedLayerBindingWrites(rawMap, remoteKeymap){
+  const changes=[];
+  const unsupported=[];
+  let targetCount=0;
+  state.layers.forEach((layer,li)=>{
+    const remoteLayer=remoteKeymap?.layers?.[li];
+    (layer.bindings||[]).forEach((binding,ki)=>{
+      const raw=(binding.raw||'').trim() || '&none';
+      targetCount++;
+      const remoteBinding=rawMap.rawMap.get(raw) || bindingFromParsedRaw(parseRawBinding(raw), rawMap.behaviorIdsByLabel, rawMap.remoteKeymap);
+      if(!remoteBinding){
+        unsupported.push({layerIndex:li,keyPosition:ki,raw,reason:describeUnsupportedBinding(raw,rawMap)});
+        return;
+      }
+      if(bindingKey(remoteLayer?.bindings?.[ki])===bindingKey(remoteBinding)) return;
+      changes.push({layerIndex:li,keyPosition:ki,raw,binding:remoteBinding});
+    });
+  });
+  return {changes,unsupported,targetCount};
+}
 async function applyKeymapToDevice({quiet=false}={}){
   if(!state.device.conn) return {error:'MCU is not connected. Click Write keymap (RPC) again and select the USB serial device.'};
   if(!state.layers.length) return {error:'Keymap is not loaded.'};
@@ -4444,8 +4664,8 @@ async function applyKeymapToDevice({quiet=false}={}){
     if(!quiet){
       deviceLog(`Converter ${DEVICE_WRITE_CONVERTER_VERSION}: kpId=${rawMap.behaviorIdsByLabel.get('kp') ?? inferKeyboardBehaviorIdFromRemote(remoteKeymap) ?? 'unknown'}, ENTER=${enterBinding?JSON.stringify(enterBinding):'unsupported'}, known=${[...rawMap.behaviorIdsByLabel.keys()].sort().join(',')||'(none)'}`);
     }
-    const {changes,unsupported}=collectLayerBindingChanges(rawMap);
-    if(!quiet) deviceLog(`Preparing ${changes.length} changed key bindings. Unsupported: ${unsupported.length}.`);
+    const {changes,unsupported,targetCount}=collectDisplayedLayerBindingWrites(rawMap,remoteKeymap);
+    if(!quiet) deviceLog(`Preparing displayed keymap target: ${targetCount} keys, ${changes.length} writes needed. Unsupported: ${unsupported.length}.`);
     if(!quiet && unsupported.length){
       deviceLog('Unsupported before write:\n'+formatUnsupportedList(unsupported));
     }
@@ -4468,12 +4688,12 @@ async function applyKeymapToDevice({quiet=false}={}){
     state.device.keymap=remoteKeymap;
     state.baselineLayers=deepClone(state.layers);
     if(!quiet){
-      deviceLog(`Wrote ${written} key bindings to MCU and saved changes.`);
+      deviceLog(`Wrote displayed keymap to MCU: ${written} key bindings changed, ${targetCount} keys checked, and changes saved.`);
       if(unsupported.length){
         deviceLog('Unsupported bindings need firmware rebuild or direct ZMK Studio support:\n'+formatUnsupportedList(unsupported));
       }
     }
-    return {changedCount:written,unsupportedCount:unsupported.length};
+    return {changedCount:written,unsupportedCount:unsupported.length,targetCount};
   }catch(e){
     return {error:e?.message||String(e)};
   }
@@ -4573,9 +4793,9 @@ async function writeDeviceNow(){
     return;
   }
   if(result.unsupportedCount>0){
-    setStatus(`RPC wrote ${result.changedCount} layer keys; ${result.unsupportedCount} items require firmware rebuild. See Device log for details.`, 's-warn');
+    setStatus(`RPC checked displayed keymap (${result.targetCount||0} keys), wrote ${result.changedCount}; ${result.unsupportedCount} items require firmware rebuild or mapping.`, 's-warn');
   }else{
-    setStatus(`RPC keymap write complete (${result.changedCount} layer keys).`,'s-ok');
+    setStatus(`RPC wrote displayed keymap (${result.changedCount} changed / ${result.targetCount||0} checked).`,'s-ok');
   }
   markLayerBindingsWritten();
 }
@@ -4596,19 +4816,17 @@ async function init(){
   renderPalette();
   const r=await api('/api/keymap');
   if(!r.error){
-    state.layers=r.layers; state.currentLayer=0;
-    state.baselineLayers=deepClone(r.layers||[]);
     state.combos=r.combos||[];
     state.conditionalLayers=r.conditional_layers||[];
     state.tdDefs=r.td_definitions||state.tdDefs;
     if(r.macro_definitions) state.macroDefs=hydrateMacroDefs(r.macro_definitions);
     injectCustomPalette(r.custom_bindings||[]);
-    document.getElementById('file-status').textContent=r.path;
-    document.getElementById('status-info').textContent=`${r.layers.length} layers / ${(r.layers[0]?.bindings||[]).length} keys`;
-    document.getElementById('no-data-box').classList.add('d-none');
-    document.getElementById('keyboard').classList.remove('d-none');
-    renderLayerBtns(); renderKeyboard(); renderPalette(); renderTpGestureKeys(); renderModTapTab(); renderComboTab(); renderConditionalTab(); renderMacroTab(); markSaved();
-    setStatus('Loaded','s-ok');
+    applyDisplayedKeymap(r.layers||[], {
+      sourceLabel:r.path,
+      statusText:'Loaded',
+      statusClass:'s-ok',
+      markAsSaved:true,
+    });
   } else { setStatus('Open settings and choose the firmware folder first.','s-warn'); }
   updateDevicePanel();
   ['left','right','main'].forEach(side=>loadConfig(side).catch(()=>{}));
