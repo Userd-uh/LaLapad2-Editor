@@ -1564,7 +1564,7 @@ const state={
   paletteContext:null,
   baselineLayers:[],
   savedSnapshot:null,
-  device:{conn:null,transport:null,label:'',mode:'',keymap:null,realtime:false},
+  device:{conn:null,transport:null,label:'',mode:'',keymap:null,physicalLayouts:null,positionMap:null,realtime:false},
 };
 
 // 笏笏 API / Status 笏笏
@@ -4210,16 +4210,17 @@ async function connectDevice(mode){
     setDeviceStatus('Connecting...','warn');
     deviceLog(`Connecting via ${mode.toUpperCase()}...`);
     await cleanupDeviceTransport('reconnect');
-    state.device={conn:null,transport:null,label:'',mode:'',keymap:null,behaviors:null,realtime:state.device.realtime};
+    state.device={conn:null,transport:null,label:'',mode:'',keymap:null,physicalLayouts:null,positionMap:null,behaviors:null,realtime:state.device.realtime};
     transport=mode==='usb' ? await requestUsbSerialTransport() : await requestBleTransport();
     const zmk=await loadZmkStudioClient();
     const activeTransport=transport;
     const conn=zmk.core.create_rpc_connection(activeTransport,{signal:activeTransport.abortController.signal});
-    state.device={...state.device,conn,transport:activeTransport,label:activeTransport.label||'',mode:mode.toUpperCase(),keymap:null,behaviors:null};
+    state.device={...state.device,conn,transport:activeTransport,label:activeTransport.label||'',mode:mode.toUpperCase(),keymap:null,physicalLayouts:null,positionMap:null,behaviors:null};
     const info=await callDeviceRpc({core:{getDeviceInfo:true}});
     const keymapResp=await callDeviceRpc({keymap:{getKeymap:true}});
     const name=info.core?.getDeviceInfo?.name||activeTransport.label||'ZMK device';
     state.device={...state.device,label:name,keymap:keymapResp.keymap?.getKeymap||null};
+    await loadDevicePhysicalLayouts();
     setDeviceStatus('Connected','ok');
     updateDevicePanel();
     deviceLog(`Connected: ${name}`);
@@ -4230,13 +4231,87 @@ async function connectDevice(mode){
       try{ transport.abortController?.abort('connection failed'); }catch(_e){}
       if(transport.port) await closeUsbSerialPort(transport.port);
     }
-    state.device={conn:null,transport:null,label:'',mode:'',keymap:null,behaviors:null,realtime:state.device.realtime};
+    state.device={conn:null,transport:null,label:'',mode:'',keymap:null,physicalLayouts:null,positionMap:null,behaviors:null,realtime:state.device.realtime};
     updateDevicePanel();
     const msg=mode==='ble' ? explainBleConnectionError(e) : (e?.message||String(e));
     setDeviceStatus('Connection failed','err');
     deviceLog(`Connection failed: ${msg}`);
     setStatus('MCU connection error: '+msg,'s-err');
     return false;
+  }
+}
+function activeDevicePhysicalLayout(){
+  const layouts=state.device.physicalLayouts;
+  const list=layouts?.layouts||[];
+  if(!list.length) return null;
+  const idx=Number(layouts.activeLayoutIndex)||0;
+  return list[idx]||list[0]||null;
+}
+function keyCenter(key){
+  const width=Number(key.width ?? key.w ?? 100);
+  const height=Number(key.height ?? key.h ?? 100);
+  return {
+    x:Number(key.x||0)+width/2,
+    y:Number(key.y||0)+height/2,
+  };
+}
+function buildDeviceEditorPositionMap(physicalLayouts, keyCount){
+  const count=Math.max(Number(keyCount)||0, KL.length);
+  const identity={
+    deviceToEditor:Array.from({length:count},(_,i)=>i),
+    editorToDevice:Array.from({length:count},(_,i)=>i),
+    source:'identity',
+    maxScore:0,
+  };
+  const list=physicalLayouts?.layouts||[];
+  const layout=list[Number(physicalLayouts?.activeLayoutIndex)||0]||list[0];
+  if(!layout?.keys?.length) return identity;
+  const deviceToEditor=[];
+  const editorToDevice=Array.from({length:Math.max(KL.length,layout.keys.length)},(_,i)=>i);
+  const unused=new Set(KL.map((_,i)=>i));
+  let maxScore=0;
+  layout.keys.forEach((key,deviceIndex)=>{
+    const dc=keyCenter(key);
+    let bestIndex=deviceIndex<KL.length ? deviceIndex : 0;
+    let bestScore=Number.POSITIVE_INFINITY;
+    unused.forEach(editorIndex=>{
+      const local=KL[editorIndex];
+      const lc=keyCenter(local);
+      const score=Math.abs(dc.x-lc.x)+Math.abs(dc.y-lc.y)
+        + Math.abs(Number(key.width||100)-Number(local.w||100))/2
+        + Math.abs(Number(key.height||100)-Number(local.h||100))/2;
+      if(score<bestScore){
+        bestScore=score;
+        bestIndex=editorIndex;
+      }
+    });
+    deviceToEditor[deviceIndex]=bestIndex;
+    editorToDevice[bestIndex]=deviceIndex;
+    unused.delete(bestIndex);
+    maxScore=Math.max(maxScore,bestScore);
+  });
+  return {deviceToEditor,editorToDevice,source:layout.name||'device physical layout',maxScore};
+}
+async function loadDevicePhysicalLayouts(){
+  if(state.device.physicalLayouts) return state.device.physicalLayouts;
+  try{
+    const resp=await callDeviceRpc({keymap:{getPhysicalLayouts:true}},8000);
+    const layouts=resp.keymap?.getPhysicalLayouts||null;
+    state.device.physicalLayouts=layouts;
+    const keyCount=state.device.keymap?.layers?.[0]?.bindings?.length||0;
+    state.device.positionMap=buildDeviceEditorPositionMap(layouts,keyCount);
+    const layout=activeDevicePhysicalLayout();
+    if(layout?.keys?.length){
+      deviceLog(`Device physical layout: ${layout.name||'(unnamed)'} (${layout.keys.length} keys), position map max delta ${Math.round(state.device.positionMap.maxScore)}.`);
+    }else{
+      deviceLog('Device physical layout unavailable; using editor key order.');
+    }
+    return layouts;
+  }catch(e){
+    state.device.physicalLayouts=null;
+    state.device.positionMap=buildDeviceEditorPositionMap(null,state.device.keymap?.layers?.[0]?.bindings?.length||0);
+    deviceLog('Device physical layout read failed; using editor key order: '+(e?.message||String(e)));
+    return null;
   }
 }
 async function loadKeymapFromDevice(){
@@ -4256,9 +4331,11 @@ async function loadKeymapFromDevice(){
       return;
     }
     await loadDeviceBehaviors();
-    const rawMap=buildRawBindingMap(state.layers?.length ? state.layers : state.baselineLayers,remoteKeymap);
-    rawMap.remoteKeymap=remoteKeymap;
     state.device.keymap=remoteKeymap;
+    await loadDevicePhysicalLayouts();
+    state.device.positionMap=buildDeviceEditorPositionMap(state.device.physicalLayouts,remoteKeymap.layers?.[0]?.bindings?.length||0);
+    const rawMap=buildRawBindingMap(state.layers?.length ? state.layers : state.baselineLayers,remoteKeymap,{positionMap:state.device.positionMap});
+    rawMap.remoteKeymap=remoteKeymap;
     const layers=layersFromDeviceKeymap(remoteKeymap,rawMap);
     applyDisplayedKeymap(layers,{
       sourceLabel:`MCU: ${state.device.label||'ZMK device'}`,
@@ -4268,6 +4345,11 @@ async function loadKeymapFromDevice(){
     });
     const unknown=layers.reduce((count,layer)=>count+(layer.bindings||[]).filter(b=>/^&behavior_\d+/.test(b.raw||'')).length,0);
     deviceLog(`Loaded ${layers.length} layers from MCU into the editor${unknown?`; ${unknown} bindings are shown as behavior_id placeholders`:''}.`);
+    if(layers[1]?.bindings?.length){
+      const map=state.device.positionMap||buildDeviceEditorPositionMap(null,layers[1].bindings.length);
+      const sample=layers[1].bindings.slice(0,20).map((b,editorIndex)=>`E${editorIndex}/D${map.editorToDevice?.[editorIndex] ?? editorIndex}:${b.raw}`).join(' | ');
+      deviceLog(`Layer 1 read sample after position mapping: ${sample}`);
+    }
     if(unknown){
       setStatus(`Loaded keymap from MCU. ${unknown} bindings need behavior mapping before file export/RPC rewrite.`, 's-warn');
     }
@@ -4279,7 +4361,7 @@ async function loadKeymapFromDevice(){
 }
 async function disconnectDevice(){
   await cleanupDeviceTransport('user disconnect');
-  state.device={conn:null,transport:null,label:'',mode:'',keymap:null,realtime:state.device.realtime};
+  state.device={conn:null,transport:null,label:'',mode:'',keymap:null,physicalLayouts:null,positionMap:null,behaviors:null,realtime:state.device.realtime};
   setDeviceStatus('Disconnected');
   updateDevicePanel();
   deviceLog('Disconnected.');
@@ -4305,6 +4387,12 @@ const DEVICE_BEHAVIOR_LABEL_ALIASES={
   'Mod Tap2':'mt2',
   'ModTap2':'mt2',
   'Toggle Layer':'tog',
+  'Mouse Button':'mkp',
+  'Bluetooth':'bt',
+  'Output Selection':'out',
+  'Bootloader':'bootloader',
+  'Reset':'sys_reset',
+  'System Reset':'sys_reset',
 };
 function aliasForDeviceBehavior(details){
   const name=(details?.displayName||'').trim();
@@ -4317,6 +4405,16 @@ function aliasForDeviceBehavior(details){
   if(lower==='tolayer') return 'to';
   if(lower==='togglelayer') return 'tog';
   if(lower==='mt2'||lower==='modtap2') return 'mt2';
+  if(lower==='mousebutton'||lower==='mousekeypress'||lower==='pointingbutton') return 'mkp';
+  if(lower==='bluetooth') return 'bt';
+  if(lower==='outputselection'||lower==='output') return 'out';
+  if(lower==='bootloader') return 'bootloader';
+  if(lower==='reset'||lower==='systemreset') return 'sys_reset';
+  const constants=(details?.metadata||[]).flatMap(set=>[...(set.param1||[]),...(set.param2||[])]);
+  const constantNames=constants.map(v=>String(v.name||'').toUpperCase());
+  if(constantNames.some(n=>/^BT_(SEL|CLR|CLR_ALL)/.test(n))) return 'bt';
+  if(constantNames.some(n=>/^OUT_/.test(n))) return 'out';
+  if(constantNames.some(n=>['LCLK','RCLK','MCLK','MB1','MB2','MB3','MB4','MB5','INPUT_BTN_0','INPUT_BTN_1','INPUT_BTN_2','INPUT_BTN_3','INPUT_BTN_4'].includes(n))) return 'mkp';
   if((details?.metadata||[]).some(set=>(set.param1||[]).some(param=>param.hidUsage))){
     return 'kp';
   }
@@ -4352,6 +4450,18 @@ const HID_KEYBOARD_USAGE={
   LWIN:0xe3,RWIN:0xe7,
 };
 const HID_USAGE_KEYCODE=new Map(Object.entries(HID_KEYBOARD_USAGE).map(([name,usage])=>[usage,name]));
+const MOUSE_BUTTON_PARAM_LABELS={
+  0:'LCLK',1:'RCLK',2:'MCLK',3:'MB4',4:'MB5',
+  0x110:'LCLK',0x111:'RCLK',0x112:'MCLK',0x113:'MB4',0x114:'MB5',
+  272:'LCLK',273:'RCLK',274:'MCLK',275:'MB4',276:'MB5',
+};
+const DEVICE_CONSTANT_ALIASES={
+  INPUT_BTN_0:'LCLK',INPUT_BTN_1:'RCLK',INPUT_BTN_2:'MCLK',INPUT_BTN_3:'MB4',INPUT_BTN_4:'MB5',
+  BTN_LEFT:'LCLK',BTN_RIGHT:'RCLK',BTN_MIDDLE:'MCLK',BTN_SIDE:'MB4',BTN_EXTRA:'MB5',
+  MB1:'LCLK',MB2:'RCLK',MB3:'MCLK',
+  OUT_USB:'OUT_USB',OUT_BLE:'OUT_BLE',OUT_TOG:'OUT_TOG',
+  BT_CLR_ALL:'BT_CLR_ALL',BT_CLR:'BT_CLR',BT_SEL:'BT_SEL',
+};
 const HID_USAGE_MODIFIERS={
   LC:0x01,LCTRL:0x01,LEFT_CONTROL:0x01,
   LS:0x02,LSHIFT:0x02,LEFT_SHIFT:0x02,
@@ -4423,7 +4533,33 @@ async function loadDeviceBehaviors(){
   }
   return state.device.behaviors;
 }
-function buildRawBindingMap(localLayers, remoteKeymap){
+function maybeInferBehaviorIdFromLocalPosition(parsed, remoteBinding, behaviorIdsByLabel, remoteKeymap){
+  if(!parsed || !remoteBinding || behaviorIdsByLabel.has(parsed.label)) return;
+  if(parsed.label==='kp'){
+    const expected=keycodeToHidUsage(parsed.params[0]);
+    if(expected!==null && sameHidUsageIgnoringImplicitMods(remoteBinding.param1,expected)){
+      behaviorIdsByLabel.set('kp',remoteBinding.behaviorId);
+    }
+    return;
+  }
+  if(['mo','to','tog'].includes(parsed.label)){
+    const layerId=layerIndexToDeviceId(remoteKeymap, parsed.params[0]);
+    if(layerId!==null && Number(remoteBinding.param1)===Number(layerId) && Number(remoteBinding.param2||0)===0){
+      behaviorIdsByLabel.set(parsed.label,remoteBinding.behaviorId);
+    }
+    return;
+  }
+  if(['mt','mt2'].includes(parsed.label)){
+    const holdUsage=keycodeToHidUsage(parsed.params[0]);
+    const tapUsage=keycodeToHidUsage(parsed.params[1]);
+    if(holdUsage!==null && tapUsage!==null && Number(remoteBinding.param1)===Number(holdUsage) && Number(remoteBinding.param2)===Number(tapUsage)){
+      behaviorIdsByLabel.set(parsed.label,remoteBinding.behaviorId);
+    }
+  }
+}
+function buildRawBindingMap(localLayers, remoteKeymap, options={}){
+  const allowPositionalFallback=!!options.allowPositionalFallback;
+  const positionMap=options.positionMap||state.device.positionMap||buildDeviceEditorPositionMap(null,remoteKeymap?.layers?.[0]?.bindings?.length||0);
   const map=new Map();
   const conflicts=new Set();
   const behaviorIdsByLabel=new Map();
@@ -4451,16 +4587,20 @@ function buildRawBindingMap(localLayers, remoteKeymap){
     const remoteLayer=remoteKeymap?.layers?.[li];
     (layer.bindings||[]).forEach((b,ki)=>{
       const raw=(b.raw||'').trim();
-      const rb=remoteLayer?.bindings?.[ki];
+      const deviceIndex=positionMap.editorToDevice?.[ki] ?? ki;
+      const rb=remoteLayer?.bindings?.[deviceIndex];
       if(!raw||!rb) return;
       const parsed=parseRawBinding(raw);
-      if(parsed && !behaviorIdsByLabel.has(parsed.label)) behaviorIdsByLabel.set(parsed.label,rb.behaviorId);
+      maybeInferBehaviorIdFromLocalPosition(parsed,rb,behaviorIdsByLabel,remoteKeymap);
       if(parsed?.label==='kp'){
         const expected=keycodeToHidUsage(parsed.params[0]);
         if(expected!==null && sameHidUsageIgnoringImplicitMods(rb.param1,expected)){
           addInferredBehaviorId('kp',rb.behaviorId);
         }
       }
+      const converted=parsed ? bindingFromParsedRaw(parsed,behaviorIdsByLabel,remoteKeymap) : null;
+      const shouldMap=(!!converted && bindingKey(converted)===bindingKey(rb)) || (allowPositionalFallback && !converted);
+      if(!shouldMap) return;
       const prev=map.get(raw);
       if(prev&&bindingKey(prev)!==bindingKey(rb)) conflicts.add(raw);
       else map.set(raw,{...rb});
@@ -4487,6 +4627,24 @@ function behaviorLabelById(rawMap){
     if(alias && details?.id!==undefined && !labels.has(details.id)) labels.set(details.id,alias);
   });
   return labels;
+}
+function behaviorDetailsById(behaviorId){
+  return state.device.behaviors?.[behaviorId] || null;
+}
+function normalizeDeviceConstantName(name){
+  const key=String(name||'').trim().replace(/^&/,'').replace(/[\s-]+/g,'_').toUpperCase();
+  return DEVICE_CONSTANT_ALIASES[key] || key;
+}
+function deviceConstantName(details, paramName, value){
+  const sets=details?.metadata||[];
+  for(const set of sets){
+    for(const param of (set?.[paramName]||[])){
+      if(param.constant!==undefined && Number(param.constant)===Number(value)){
+        return normalizeDeviceConstantName(param.name);
+      }
+    }
+  }
+  return '';
 }
 function layerIdToIndex(remoteKeymap, layerId){
   const index=(remoteKeymap?.layers||[]).findIndex(layer=>layer?.id===layerId);
@@ -4550,6 +4708,25 @@ function deviceBindingToRaw(binding, rawMap, layerIndex, keyPosition){
     const tap=hidUsageToKeycode(p2);
     if(hold&&tap) return `&${label} ${hold} ${tap}`;
   }
+  if(label==='mkp'){
+    const details=behaviorDetailsById(binding.behaviorId);
+    const button=deviceConstantName(details,'param1',p1) || MOUSE_BUTTON_PARAM_LABELS[p1] || '';
+    return button ? `&mkp ${button}` : `&mkp ${p1}`;
+  }
+  if(label==='bt'){
+    const details=behaviorDetailsById(binding.behaviorId);
+    const action=deviceConstantName(details,'param1',p1) || 'BT_SEL';
+    if(action==='BT_CLR_ALL') return '&bt BT_CLR_ALL';
+    if(action==='BT_CLR') return '&bt BT_CLR';
+    if(action==='BT_SEL') return `&bt BT_SEL ${p2}`;
+    return `&bt ${action}${p2 ? ' '+p2 : ''}`.trim();
+  }
+  if(label==='out'){
+    const details=behaviorDetailsById(binding.behaviorId);
+    const output=deviceConstantName(details,'param1',p1) || `OUT_${p1}`;
+    return `&out ${output}`;
+  }
+  if(label==='bootloader'||label==='sys_reset') return `&${label}`;
   if(['mo','to','tog'].includes(label)){
     const index=layerIdToIndex(rawMap.remoteKeymap,p1);
     if(index!==null) return `&${label} ${index}`;
@@ -4561,10 +4738,16 @@ function layersFromDeviceKeymap(remoteKeymap, rawMap){
   return (remoteKeymap?.layers||[]).map((layer,li)=>{
     const local=state.layers?.[li]||state.baselineLayers?.[li]||{};
     const name=layer.displayName||layer.display_name||layer.name||local.display_name||`Layer ${li}`;
+    const positionMap=state.device.positionMap||buildDeviceEditorPositionMap(null,layer.bindings?.length||0);
+    const bindings=Array.from({length:Math.max(KL.length,layer.bindings?.length||0)},()=>({raw:'&none'}));
+    (layer.bindings||[]).forEach((binding,deviceIndex)=>{
+      const editorIndex=positionMap.deviceToEditor?.[deviceIndex] ?? deviceIndex;
+      bindings[editorIndex]={raw:deviceBindingToRaw(binding,rawMap,li,editorIndex)};
+    });
     return {
       name:local.name||`layer_${li}`,
       display_name:name,
-      bindings:(layer.bindings||[]).map((binding,ki)=>({raw:deviceBindingToRaw(binding,rawMap,li,ki)})),
+      bindings,
     };
   });
 }
@@ -4610,21 +4793,24 @@ function describeUnsupportedBinding(raw, rawMap){
   return `behavior "${parsed.label}" exists as id ${behaviorId}, but this editor only converts simple &kp/&mt/&mt2/&mo/&to/&tog/&none/&trans bindings`;
 }
 function formatUnsupportedList(items){
-  return items.slice(0,12).map(x=>`  L${x.layerIndex} K${x.keyPosition}: ${x.raw} (${x.reason||'no diagnostic reason was attached; refresh the editor page and retry'})`).join('\n')+(items.length>12?`\n  ...and ${items.length-12} more`:'');
+  return items.slice(0,12).map(x=>`  L${x.layerIndex} K${x.displayKeyPosition ?? x.keyPosition}${x.displayKeyPosition!==undefined&&x.displayKeyPosition!==x.keyPosition?` (device K${x.keyPosition})`:''}: ${x.raw} (${x.reason||'no diagnostic reason was attached; refresh the editor page and retry'})`).join('\n')+(items.length>12?`\n  ...and ${items.length-12} more`:'');
 }
 function collectLayerBindingChanges(rawMap){
   const changes=[];
   const unsupported=[];
   const baseline=state.baselineLayers||[];
+  const positionMap=state.device.positionMap||buildDeviceEditorPositionMap(null,rawMap.remoteKeymap?.layers?.[0]?.bindings?.length||0);
   state.layers.forEach((layer,li)=>{
     const baseLayer=baseline[li]||{};
+    const remoteLayer=rawMap.remoteKeymap?.layers?.[li];
     (layer.bindings||[]).forEach((binding,ki)=>{
       const raw=(binding.raw||'').trim();
       const oldRaw=(baseLayer.bindings?.[ki]?.raw||'').trim();
       if(raw===oldRaw) return;
+      const deviceIndex=positionMap.editorToDevice?.[ki] ?? ki;
       const remoteBinding=rawMap.rawMap.get(raw) || bindingFromParsedRaw(parseRawBinding(raw), rawMap.behaviorIdsByLabel, rawMap.remoteKeymap);
-      if(remoteBinding) changes.push({layerIndex:li,keyPosition:ki,raw,binding:remoteBinding});
-      else unsupported.push({layerIndex:li,keyPosition:ki,raw,reason:describeUnsupportedBinding(raw,rawMap)});
+      if(remoteBinding && bindingKey(remoteLayer?.bindings?.[deviceIndex])!==bindingKey(remoteBinding)) changes.push({layerIndex:li,keyPosition:deviceIndex,displayKeyPosition:ki,raw,binding:remoteBinding});
+      else if(!remoteBinding) unsupported.push({layerIndex:li,keyPosition:deviceIndex,displayKeyPosition:ki,raw,reason:describeUnsupportedBinding(raw,rawMap)});
     });
   });
   return {changes,unsupported};
@@ -4633,18 +4819,20 @@ function collectDisplayedLayerBindingWrites(rawMap, remoteKeymap){
   const changes=[];
   const unsupported=[];
   let targetCount=0;
+  const positionMap=state.device.positionMap||buildDeviceEditorPositionMap(null,remoteKeymap?.layers?.[0]?.bindings?.length||0);
   state.layers.forEach((layer,li)=>{
     const remoteLayer=remoteKeymap?.layers?.[li];
     (layer.bindings||[]).forEach((binding,ki)=>{
       const raw=(binding.raw||'').trim() || '&none';
+      const deviceIndex=positionMap.editorToDevice?.[ki] ?? ki;
       targetCount++;
       const remoteBinding=rawMap.rawMap.get(raw) || bindingFromParsedRaw(parseRawBinding(raw), rawMap.behaviorIdsByLabel, rawMap.remoteKeymap);
       if(!remoteBinding){
-        unsupported.push({layerIndex:li,keyPosition:ki,raw,reason:describeUnsupportedBinding(raw,rawMap)});
+        unsupported.push({layerIndex:li,keyPosition:deviceIndex,displayKeyPosition:ki,raw,reason:describeUnsupportedBinding(raw,rawMap)});
         return;
       }
-      if(bindingKey(remoteLayer?.bindings?.[ki])===bindingKey(remoteBinding)) return;
-      changes.push({layerIndex:li,keyPosition:ki,raw,binding:remoteBinding});
+      if(bindingKey(remoteLayer?.bindings?.[deviceIndex])===bindingKey(remoteBinding)) return;
+      changes.push({layerIndex:li,keyPosition:deviceIndex,displayKeyPosition:ki,raw,binding:remoteBinding});
     });
   });
   return {changes,unsupported,targetCount};
@@ -4657,7 +4845,10 @@ async function applyKeymapToDevice({quiet=false}={}){
     const remoteKeymap=latest.keymap?.getKeymap;
     if(!remoteKeymap?.layers?.length) return {error:'Device keymap could not be read.'};
     await loadDeviceBehaviors();
-    const rawMap=buildRawBindingMap(state.baselineLayers,remoteKeymap);
+    state.device.keymap=remoteKeymap;
+    await loadDevicePhysicalLayouts();
+    state.device.positionMap=buildDeviceEditorPositionMap(state.device.physicalLayouts,remoteKeymap.layers?.[0]?.bindings?.length||0);
+    const rawMap=buildRawBindingMap(state.baselineLayers,remoteKeymap,{allowPositionalFallback:true,positionMap:state.device.positionMap});
     rawMap.remoteKeymap=remoteKeymap;
     const enterParsed=parseRawBinding('&kp ENTER');
     const enterBinding=bindingFromParsedRaw(enterParsed,rawMap.behaviorIdsByLabel,remoteKeymap);
