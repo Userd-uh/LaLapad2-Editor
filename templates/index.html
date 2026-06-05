@@ -439,8 +439,8 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
   <div class="toolbar-group run-actions" aria-label="MCU actions">
     <span class="toolbar-label">Run</span>
     <button class="btn" id="connect-usb-btn" onclick="connectDevice('usb')" title="Open the USB serial picker and connect through ZMK Studio RPC.">Connect USB</button>
-    <button class="btn" id="connect-ble-btn" onclick="connectDevice('ble')" title="Connect through Web Bluetooth and ZMK Studio RPC.">Connect Bluetooth</button>
     <button class="btn" id="disconnect-btn" onclick="disconnectDevice()" title="Close the current MCU connection.">Disconnect</button>
+    <button class="btn" id="connect-ble-btn" onclick="connectDevice('ble')" title="Connect through Web Bluetooth and ZMK Studio RPC.">Connect Bluetooth</button>
     <button class="btn" id="load-device-btn" onclick="loadKeymapFromDevice()" title="Read the connected MCU keymap through ZMK Studio RPC and show it in the editor.">Load from MCU</button>
     <button class="btn" id="export-keymap-btn" onclick="exportDisplayedKeymap()" title="Export the keymap currently shown in the editor.">Export keymap</button>
     <button class="btn rpc" id="write-rpc-btn" onclick="writeDeviceNow()" title="Writes the layer key bindings currently shown in the editor. Uses ZMK Studio RPC and does not rebuild firmware.">Write keymap (RPC)</button>
@@ -903,6 +903,13 @@ function mtFieldChoice(expr,label,title=''){ return palItem(expr,label,title); }
 function mt2Wrap(hold,label,title=''){
   return palItem(`&mt2 ${hold} ${MOD_PH}`, `${label}\n(kc)`, title || `Hold ${label}, tap key`);
 }
+function ltWrap(layer){
+  return {
+    r:`&lt ${layer} ${MOD_PH}`,
+    l:layerTapLabel(layer,'kc'),
+    title:`Tap sends a key; hold momentarily activates ${layerDisplayName(layer)} (LT${layer}).`,
+  };
+}
 function abbreviateKeycodeToken(token){
   return {
     SYSTEM:'SYS', POWER:'PWR', SLEEP:'SLP', WAKE:'WAKE',
@@ -977,6 +984,10 @@ function layerBindingLabel(prefix, index, suffix=''){
   const op=`${prefix}${n}${suffix ? ' '+suffix : ''}`;
   return `${name}\n${op}`;
 }
+function layerTapLabel(index, tapLabel='kc'){
+  const n=(index===undefined||index===null||index==='') ? '?' : String(index);
+  return `${tapLabel || 'kc'}\nLT${n}`;
+}
 function layerBindingTitle(prefix, index, action){
   const n=(index===undefined||index===null||index==='') ? '?' : String(index);
   return `${action}: ${layerDisplayName(n)} (${prefix}${n})`;
@@ -1014,7 +1025,7 @@ function bindingLabel(raw){
     return layerBindingLabel(prefix,layerM[2]);
   }
   const ltM=s.match(/^&lt\s+(\S+)\s+(.+)$/);
-  if(ltM) return layerBindingLabel('LT',ltM[1],shortKeyLabel(ltM[2]));
+  if(ltM) return layerTapLabel(ltM[1],shortKeyLabel(ltM[2]));
   // パレット定義のラベルを最優先で参照（パレットとキーマップの表示を統一）
   if(PAL_LABEL[s]) return PAL_LABEL[s];
   if(s==='&trans') return '▽';
@@ -1031,7 +1042,7 @@ function bindingLabel(raw){
   // 菫ｮ鬟ｾ繝励Ξ繝ｼ繧ｹ繝帙Ν繝繝ｼ
   if(s.includes(MOD_PH)){
     const p=s.replace(/^&/,'').split(/\s+/);
-    if(p[0]==='lt') return `LT(${p[1]||'?'})\n(kc)`;
+    if(p[0]==='lt') return layerTapLabel(p[1]||'?','kc');
     const inner=s.replace(/^&kp\s+/,'');
     if(inner) return inner.replace(MOD_PH,'kc');
     return '?';
@@ -1041,7 +1052,7 @@ function bindingLabel(raw){
   switch(beh){
     case 'kp': return shortKeyLabel(a[0]||'?');
     case 'mt':case 'mt2': return shortKeyLabel(a[1]||'?')+'\n'+shortKeyLabel(a[0]||'?');
-    case 'lt': return layerBindingLabel('LT',a[0]||'?',shortKeyLabel(a[1]||'?'));
+    case 'lt': return layerTapLabel(a[0]||'?',shortKeyLabel(a[1]||'?'));
     case 'mo': return layerBindingLabel('MO',a[0]||'?');
     case 'to': return layerBindingLabel('TO',a[0]||'?');
     case 'tog': return layerBindingLabel('TG',a[0]||'?');
@@ -1362,6 +1373,12 @@ const MT2_GROUPS=[
     mt2Wrap('BACKSLASH','\\','Hold Backslash, tap selected key'),
   ]},
 ];
+function getLayerTapGroups(){
+  const layers=getLayerIndices();
+  return [
+    {label:'LayerTap',keys:layers.map(n=>ltWrap(n))},
+  ];
+}
 function getLayerPaletteRows(){
   const layers=getLayerIndices();
   const upperLayers=layers.filter(n=>n>0);
@@ -1380,7 +1397,7 @@ function getLayerPaletteRows(){
       ...layers.map(n=>({r:`&to ${n}`,l:layerBindingLabel('TO',n),title:`${layerBindingTitle('TO',n,'Switch to layer')}; deactivates the others.`})),
     ],
     [
-      ...layers.map(n=>({r:`&lt ${n} ${MOD_PH}`,l:layerBindingLabel('LT',n,'kc'),title:`Tap sends a key; hold momentarily activates ${layerDisplayName(n)} (LT${n}).`})),
+      ...layers.map(n=>({r:`&lt ${n} ${MOD_PH}`,l:layerTapLabel(n,'kc'),title:`Tap sends a key; hold momentarily activates ${layerDisplayName(n)} (LT${n}).`})),
     ],
   ];
 }
@@ -1389,6 +1406,7 @@ const PALETTE_CATS=[
   {id:'layer',label:'Layers',type:'layer_dynamic'},
   {id:'quantum',label:'Quantum',type:'quantum_grouped',groups:UI_QUANTUM_GROUPS},
   {id:'modtap2',label:'ModTap2',type:'quantum_grouped',groups:MT2_GROUPS},
+  {id:'layertap',label:'LayerTap',type:'layertap_dynamic'},
   {id:'fn',label:'Fn',wrap:true,keys:Array.from({length:24},(_,i)=>({r:'&kp F'+(i+1),l:'F'+(i+1)}))},
   {id:'mouse',label:'Mouse',wrap:true,keys:[{r:'&mkp LCLK',l:'MB1'},{r:'&mkp RCLK',l:'MB2'},{r:'&mkp MCLK',l:'MB3'},{r:'&mkp MB4',l:'MB4'},{r:'&mkp MB5',l:'MB5'}]},
   {id:'app_media',label:'App / Media',wrap:true,keys:APP_MEDIA_KEYS},
@@ -1406,8 +1424,8 @@ const PALETTE_CATS=[
   {id:'consumer_app',label:'Consumer App',wrap:true,keys:kpCodeItems(CONSUMER_APP_KEYCODES)},
   {id:'consumer_input',label:'Input Assist',wrap:true,keys:kpCodeItems(CONSUMER_INPUT_ASSIST_KEYCODES)},
 ];
-const DEFAULT_BINDING_CAT_IDS=['basic','layer','quantum','modtap2','fn','mouse','app_media','bt','td_pal','macro_pal','dyn','custom','numpad_extra','system_keys','kbd_extra','kbd_app','intl_keys','consumer_keys','consumer_action','consumer_app','consumer_input'];
-const KEYCODE_CONTEXT_CAT_IDS=['basic','fn','numpad_extra'];
+const DEFAULT_BINDING_CAT_IDS=['basic','layer','quantum','modtap2','layertap','fn','mouse','app_media','bt','td_pal','macro_pal','dyn','custom','numpad_extra','system_keys','kbd_extra','kbd_app','intl_keys','consumer_keys','consumer_action','consumer_app','consumer_input'];
+const KEYCODE_CONTEXT_CAT_IDS=['basic','layer','fn','numpad_extra'];
 
 // パレット定義から raw → label の逆引きマップを構築
 // bindingLabel() がこれを最優先で参照することで、キーマップ表示がパレット表示と一致する
@@ -1552,6 +1570,7 @@ function macroEmpty(i){ return {label:`mc${i}`,display_name:'',steps:[]}; }
 const state={
   layers:[],currentLayer:0,
   tpSide:'left',tpConfigs:{left:{},right:{}},mainConfig:{},
+  configLoaded:{left:false,right:false,main:false},
   combos:[],
   conditionalLayers:[],
   tdDefs:Array.from({length:TD_COUNT},()=>tdEmpty()),
@@ -1811,14 +1830,28 @@ function tapDanceFieldWarn(field){
 }
 function completeTemplateBinding(template, pickedRaw){
   const key=extractKeyName(pickedRaw);
+  if(!key){
+    setStatus('LayerTap / ModTap の単押し側には &kp キーを選んでください。Layer は長押し側として LayerTap を選びます。','s-warn');
+  }
   return key ? repairQuantumModifiedBinding(template.replace(MOD_PH, key)) : '';
+}
+function keycodeContextCats(){
+  return getPaletteCatsByIds(KEYCODE_CONTEXT_CAT_IDS).map(cat=>{
+    if(cat.id!=='layer') return cat;
+    return {
+      ...cat,
+      label:'Layers',
+      disableFn:()=>true,
+      note:'LayerTap の長押し側は先に LayerTap タブで選びます。',
+    };
+  });
 }
 function openTemplateFollowUpPicker(opts){
   activatePaletteContext({
     tab:opts.tab,
     title:opts.title || 'Choose the follow-up key',
     note:opts.note || 'Choose the key to combine with the selected behavior from the palette below.',
-    catIds:KEYCODE_CONTEXT_CAT_IDS,
+    cats:keycodeContextCats(),
     initialCat:'basic',
     target:opts.target,
     onPick:(pickedRaw)=>{
@@ -1924,6 +1957,22 @@ function validateTdDefsBeforeSave(){
   }
   return true;
 }
+async function ensureSaveSourcesLoaded(){
+  if(!state.layers.length){
+    await loadKeymap();
+    if(!state.layers.length) throw new Error('Keymap is not loaded.');
+  }
+  const labels={left:'Trackpad (left)',right:'Trackpad (right)',main:'General config'};
+  for(const side of ['left','right','main']){
+    if(state.configLoaded?.[side]) continue;
+    try{
+      await loadConfig(side);
+    }catch(e){
+      throw new Error(`${labels[side]} load error: ${e?.message||String(e)}`);
+    }
+    if(!state.configLoaded?.[side]) throw new Error(`${labels[side]} was not loaded.`);
+  }
+}
 
 // 笏笏 蜈ｨ菴謎ｿ晏ｭ・笏笏
 async function saveAll(opts={}){
@@ -1931,6 +1980,7 @@ async function saveAll(opts={}){
   if(!validateTdDefsBeforeSave()) return false;
   if(!quiet) setStatus('Saving...');
   try {
+    await ensureSaveSourcesLoaded();
     await api('/api/settings','POST',{td_definitions:state.tdDefs, macro_definitions:state.macroDefs});
     let tdModuleStatus='not_needed';
     if(state.layers.length){
@@ -1939,12 +1989,12 @@ async function saveAll(opts={}){
       tdModuleStatus=r.td_module||tdModuleStatus;
     }
     for(const side of ['left','right']){
-      if(Object.keys(state.tpConfigs[side]).length){
+      if(state.configLoaded[side]){
         const r=await api(`/api/config/${side}`,'POST',{config:state.tpConfigs[side]});
         if(r.error){ setStatus(`Trackpad (${side}) save error: `+r.error,'s-err'); return false; }
       }
     }
-    if(Object.keys(state.mainConfig).length){
+    if(state.configLoaded.main){
       const r=await api('/api/config/main','POST',{config:state.mainConfig});
       if(r.error){ setStatus('General config save error: '+r.error,'s-err'); return false; }
     }
@@ -2041,6 +2091,9 @@ async function applyFolder(silent=false){
 }
 async function saveAndLoad(){
   closeSettings();
+  state.configLoaded={left:false,right:false,main:false};
+  state.tpConfigs={left:{},right:{}};
+  state.mainConfig={};
   await loadKeymap();
   await refreshSettingsMeta();
   ['left','right','main'].forEach(s=>loadConfig(s).catch(()=>{}));
@@ -2100,9 +2153,9 @@ async function exportDisplayedKeymap(){
   setStatus('Exported displayed keymap.','s-ok');
 }
 async function loadConfig(side){
-  const data=await api(`/api/config/${side}`); if(data.error){ setStatus(data.error,'s-err'); return; }
-  if(side==='main'){ state.mainConfig=data.config; if(document.getElementById('tab-general').classList.contains('active')) renderGeneralSettings(); }
-  else { state.tpConfigs[side]=data.config; if(side===state.tpSide&&document.getElementById('tab-trackpad').classList.contains('active')) renderTpSettings(); }
+  const data=await api(`/api/config/${side}`); if(data.error){ setStatus(data.error,'s-err'); throw new Error(data.error); }
+  if(side==='main'){ state.mainConfig=data.config||{}; state.configLoaded.main=true; if(document.getElementById('tab-general').classList.contains('active')) renderGeneralSettings(); }
+  else { state.tpConfigs[side]=data.config||{}; state.configLoaded[side]=true; if(side===state.tpSide&&document.getElementById('tab-trackpad').classList.contains('active')) renderTpSettings(); }
   resetSavedSnapshot('config',side);
   refreshUnsavedUi();
 }
@@ -2940,6 +2993,18 @@ function renderPaletteCategory(target,cat,onSelect=null,wrapLists=false){
     target.appendChild(wrap);
     return;
   }
+  if(cat.type==='layertap_dynamic'){
+    const wrap=document.createElement('div'); wrap.className='pal-quantum';
+    getLayerTapGroups().forEach(grp=>{
+      const row=document.createElement('div'); row.className='qgrp';
+      const lbl=document.createElement('span'); lbl.className='qgrp-label'; lbl.textContent=grp.label; row.appendChild(lbl);
+      const keys=document.createElement('div'); keys.className='qgrp-keys';
+      (grp.keys||[]).forEach(k=>keys.appendChild(makePalKey(k.r,k.l,k.w||'',`k-mo ${k.r.includes(MOD_PH)?'k-mod':''}`.trim(),onSelect,k.title||'',false)));
+      row.appendChild(keys); wrap.appendChild(row);
+    });
+    target.appendChild(wrap);
+    return;
+  }
   const wrap=document.createElement('div'); wrap.className='pal-wrap';
   if(cat.type==='td'){
     let tdAny=false;
@@ -3290,8 +3355,8 @@ function switchTab(name){
   document.querySelectorAll('.tab-pane').forEach(t=>t.classList.remove('active'));
   document.getElementById(`tab-${name}`).classList.add('active');
   renderPalette();
-  if(name==='trackpad'){ renderTpGestureKeys(); if(Object.keys(state.tpConfigs[state.tpSide]).length) renderTpSettings(); }
-  if(name==='general'&&Object.keys(state.mainConfig).length) renderGeneralSettings();
+  if(name==='trackpad'){ renderTpGestureKeys(); if(state.configLoaded[state.tpSide]) renderTpSettings(); }
+  if(name==='general'&&state.configLoaded.main) renderGeneralSettings();
   if(name==='conditional') renderConditionalTab();
   if(name==='modtap') renderModTapTab();
   if(name==='combo') renderComboTab();
@@ -3306,7 +3371,7 @@ function switchTpSide(side){
   state.tpSide=side;
   document.querySelectorAll('.tp-btn').forEach((b,i)=>b.classList.toggle('active',['left','right'][i]===side));
   renderTpGestureKeys();
-  if(Object.keys(state.tpConfigs[side]).length) renderTpSettings();
+  if(state.configLoaded[side]) renderTpSettings();
   else loadConfig(side);
 }
 
@@ -3760,7 +3825,7 @@ function renderMacroStepRow(slot, stepIdx, step, pairMeta=null){
           tab:'macro',
           title:`mc${slot} Step ${stepIdx+1} (${step.type}) — キーを選択`,
           note:'Quantum テンプレートに埋め込むキーを選びます。',
-          catIds:KEYCODE_CONTEXT_CAT_IDS,
+          cats:keycodeContextCats(),
           initialCat:'basic',
           target:{type:'macro-step',slot,stepIdx},
           onPick:(pickedRaw)=>{
@@ -4404,6 +4469,7 @@ function aliasForDeviceBehavior(details){
   if(lower==='momentarylayer') return 'mo';
   if(lower==='tolayer') return 'to';
   if(lower==='togglelayer') return 'tog';
+  if(lower==='layertap') return 'lt';
   if(lower==='mt2'||lower==='modtap2') return 'mt2';
   if(lower==='mousebutton'||lower==='mousekeypress'||lower==='pointingbutton') return 'mkp';
   if(lower==='bluetooth') return 'bt';
@@ -4428,7 +4494,7 @@ function parseRawBinding(raw){
   return {label:normalizeBehaviorLabel(parts[0]),params:parts.slice(1),raw:text};
 }
 const HID_KEYBOARD_PAGE=0x00070000;
-const DEVICE_WRITE_CONVERTER_VERSION='2026-05-11-mt2-rpc-1';
+const DEVICE_WRITE_CONVERTER_VERSION='2026-06-05-lt-rpc-1';
 const HID_KEYBOARD_USAGE={
   A:0x04,B:0x05,C:0x06,D:0x07,E:0x08,F:0x09,G:0x0a,H:0x0b,I:0x0c,J:0x0d,K:0x0e,L:0x0f,M:0x10,
   N:0x11,O:0x12,P:0x13,Q:0x14,R:0x15,S:0x16,T:0x17,U:0x18,V:0x19,W:0x1a,X:0x1b,Y:0x1c,Z:0x1d,
@@ -4546,6 +4612,14 @@ function maybeInferBehaviorIdFromLocalPosition(parsed, remoteBinding, behaviorId
     const layerId=layerIndexToDeviceId(remoteKeymap, parsed.params[0]);
     if(layerId!==null && Number(remoteBinding.param1)===Number(layerId) && Number(remoteBinding.param2||0)===0){
       behaviorIdsByLabel.set(parsed.label,remoteBinding.behaviorId);
+    }
+    return;
+  }
+  if(parsed.label==='lt'){
+    const layerId=layerIndexToDeviceId(remoteKeymap, parsed.params[0]);
+    const tapUsage=keycodeToHidUsage(parsed.params[1]);
+    if(layerId!==null && tapUsage!==null && Number(remoteBinding.param1)===Number(layerId) && sameHidUsageIgnoringImplicitMods(remoteBinding.param2,tapUsage)){
+      behaviorIdsByLabel.set('lt',remoteBinding.behaviorId);
     }
     return;
   }
@@ -4682,6 +4756,11 @@ function bindingFromParsedRaw(parsed, behaviorIdsByLabel, remoteKeymap){
     const layerId=layerIndexToDeviceId(remoteKeymap, parsed.params[0]);
     if(layerId!==null) return {behaviorId,param1:layerId,param2:0};
   }
+  if(parsed.label==='lt'){
+    const layerId=layerIndexToDeviceId(remoteKeymap, parsed.params[0]);
+    const tapUsage=keycodeToHidUsage(parsed.params[1]);
+    if(layerId!==null && tapUsage!==null) return {behaviorId,param1:layerId,param2:tapUsage};
+  }
   return null;
 }
 function deviceBindingToRaw(binding, rawMap, layerIndex, keyPosition){
@@ -4730,6 +4809,11 @@ function deviceBindingToRaw(binding, rawMap, layerIndex, keyPosition){
   if(['mo','to','tog'].includes(label)){
     const index=layerIdToIndex(rawMap.remoteKeymap,p1);
     if(index!==null) return `&${label} ${index}`;
+  }
+  if(label==='lt'){
+    const index=layerIdToIndex(rawMap.remoteKeymap,p1);
+    const tap=hidUsageToKeycode(p2);
+    if(index!==null && tap) return `&lt ${index} ${tap}`;
   }
   if(label) return `&${label} ${p1} ${p2}`.trim();
   return `&behavior_${binding.behaviorId} ${p1} ${p2}`.trim();
@@ -4781,16 +4865,20 @@ function describeUnsupportedBinding(raw, rawMap){
     if(usage===null) return `unknown &kp keycode "${parsed.params[0]}"`;
     return `&kp parsed as behaviorId=${behaviorId}, HID=0x${usage.toString(16)}, but no RPC binding was produced`;
   }
-  if(['mo','to','tog'].includes(parsed.label)){
+  if(['mo','to','tog','lt'].includes(parsed.label)){
     const layerId=layerIndexToDeviceId(rawMap.remoteKeymap, parsed.params[0]);
     if(layerId===null) return `layer index "${parsed.params[0]||''}" is not present on the device`;
+  }
+  if(parsed.label==='lt'){
+    if(!parsed.params[0]||!parsed.params[1]) return 'missing layer/keycode after &lt';
+    if(keycodeToHidUsage(parsed.params[1])===null) return `unknown tap keycode "${parsed.params[1]}"`;
   }
   if(['mt','mt2'].includes(parsed.label)){
     if(!parsed.params[0]||!parsed.params[1]) return `missing hold/tap keycode after &${parsed.label}`;
     if(keycodeToHidUsage(parsed.params[0])===null) return `unknown hold keycode "${parsed.params[0]}"`;
     if(keycodeToHidUsage(parsed.params[1])===null) return `unknown tap keycode "${parsed.params[1]}"`;
   }
-  return `behavior "${parsed.label}" exists as id ${behaviorId}, but this editor only converts simple &kp/&mt/&mt2/&mo/&to/&tog/&none/&trans bindings`;
+  return `behavior "${parsed.label}" exists as id ${behaviorId}, but this editor only converts simple &kp/&mt/&mt2/&lt/&mo/&to/&tog/&none/&trans bindings`;
 }
 function formatUnsupportedList(items){
   return items.slice(0,12).map(x=>`  L${x.layerIndex} K${x.displayKeyPosition ?? x.keyPosition}${x.displayKeyPosition!==undefined&&x.displayKeyPosition!==x.keyPosition?` (device K${x.keyPosition})`:''}: ${x.raw} (${x.reason||'no diagnostic reason was attached; refresh the editor page and retry'})`).join('\n')+(items.length>12?`\n  ...and ${items.length-12} more`:'');
@@ -4853,7 +4941,7 @@ async function applyKeymapToDevice({quiet=false}={}){
     const enterParsed=parseRawBinding('&kp ENTER');
     const enterBinding=bindingFromParsedRaw(enterParsed,rawMap.behaviorIdsByLabel,remoteKeymap);
     if(!quiet){
-      deviceLog(`Converter ${DEVICE_WRITE_CONVERTER_VERSION}: kpId=${rawMap.behaviorIdsByLabel.get('kp') ?? inferKeyboardBehaviorIdFromRemote(remoteKeymap) ?? 'unknown'}, ENTER=${enterBinding?JSON.stringify(enterBinding):'unsupported'}, known=${[...rawMap.behaviorIdsByLabel.keys()].sort().join(',')||'(none)'}`);
+      deviceLog(`Converter ${DEVICE_WRITE_CONVERTER_VERSION}: kpId=${rawMap.behaviorIdsByLabel.get('kp') ?? inferKeyboardBehaviorIdFromRemote(remoteKeymap) ?? 'unknown'}, ltId=${rawMap.behaviorIdsByLabel.get('lt') ?? 'unknown'}, ENTER=${enterBinding?JSON.stringify(enterBinding):'unsupported'}, known=${[...rawMap.behaviorIdsByLabel.keys()].sort().join(',')||'(none)'}`);
     }
     const {changes,unsupported,targetCount}=collectDisplayedLayerBindingWrites(rawMap,remoteKeymap);
     if(!quiet) deviceLog(`Preparing displayed keymap target: ${targetCount} keys, ${changes.length} writes needed. Unsupported: ${unsupported.length}.`);
