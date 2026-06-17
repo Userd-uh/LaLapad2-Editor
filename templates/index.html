@@ -12,6 +12,8 @@
   --bdr:#1e2c3d;--bdr2:#2a3d52;
   --kbg:#152131;--khov:#213247;
   --ok:#34d399;--err:#f87171;--warn:#fbbf24;
+  --rpc-bdr:#2563eb;--rpc-bg:#17305c;--rpc-fg:#bfdbfe;
+  --fw-bdr:#b45309;--fw-bg:#3a240b;--fw-fg:#fcd34d;
   --kmo:#132e46;--kmt:#38280f;--ksys:#3a1622;
   --kbt:#103326;--kms:#241537;--kdyn:#213510;--kcu:#18293b;
 }
@@ -37,11 +39,16 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
 .toolbar-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
 .toolbar-group.run-actions{padding-left:8px;border-left:1px solid var(--bdr2);}
 .toolbar-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;}
-.btn.rpc{border-color:#2563eb;background:#17305c;color:#bfdbfe;}
+.btn.rpc{border-color:var(--rpc-bdr);background:var(--rpc-bg);color:var(--rpc-fg);}
 .btn.rpc:hover{background:#1d4f8f;}
-.btn.firmware{border-color:#b45309;background:#3a240b;color:#fcd34d;}
+.btn.firmware{border-color:var(--fw-bdr);background:var(--fw-bg);color:var(--fw-fg);}
 .btn.firmware:hover{background:#5a3308;}
 .unsaved{color:var(--warn);font-size:18px;line-height:1;}
+.write-hint{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);}
+.write-hint span{display:inline-flex;align-items:center;gap:3px;white-space:nowrap;}
+.write-hint span::before{content:'';width:8px;height:8px;border-radius:2px;border:1px solid currentColor;}
+.write-hint .rpc{color:var(--rpc-fg);}
+.write-hint .fw{color:var(--fw-fg);}
 
 .main-tabs{background:var(--bg2);display:flex;padding:0 14px;border-bottom:1px solid var(--bdr);flex-shrink:0;}
 .main-tab{padding:6px 16px;cursor:pointer;color:var(--dim);border-bottom:2px solid transparent;font-size:12px;}
@@ -72,8 +79,11 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
   transition:border-color .1s,background .1s;}
 .key:hover{background:var(--khov);border-color:var(--a2);}
 .key.drag-over{background:#1d4ed8!important;border-color:#60a5fa!important;transform:scale(1.06);}
-.changed-outline{border-color:var(--err)!important;box-shadow:0 0 0 2px rgba(248,113,113,.95),0 0 0 5px rgba(248,113,113,.18)!important;}
-.changed-outline-inset{border-color:var(--err)!important;box-shadow:inset 0 0 0 2px rgba(248,113,113,.95),0 0 0 2px rgba(248,113,113,.18)!important;}
+.changed-outline{border-color:var(--fw-bdr)!important;box-shadow:0 0 0 2px rgba(180,83,9,.95),0 0 0 5px rgba(252,211,77,.18)!important;}
+.changed-outline.rpc{border-color:var(--rpc-bdr)!important;box-shadow:0 0 0 2px rgba(37,99,235,.95),0 0 0 5px rgba(191,219,254,.18)!important;}
+.changed-outline.fw{border-color:var(--fw-bdr)!important;box-shadow:0 0 0 2px rgba(180,83,9,.95),0 0 0 5px rgba(252,211,77,.18)!important;}
+.changed-outline-inset{border-color:var(--fw-bdr)!important;box-shadow:inset 0 0 0 2px rgba(180,83,9,.95),0 0 0 2px rgba(252,211,77,.18)!important;}
+.changed-outline-inset.rpc{border-color:var(--rpc-bdr)!important;box-shadow:inset 0 0 0 2px rgba(37,99,235,.95),0 0 0 2px rgba(191,219,254,.18)!important;}
 /* &trans: 騾壼ｸｸ繧ｭ繝ｼ縺ｨ蜷後§閭梧勹濶ｲ縲≫命繧定埋縺剰｡ｨ遉ｺ */
 .key.k-trans{background:var(--kbg);color:var(--text);border-style:dashed;}
 /* &none: 證励＞縲∬埋縺・ｵ､ */
@@ -164,7 +174,8 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
 .slabel-ja{font-size:10px;color:var(--text);}
 .slabel.has-tip{cursor:help;border-bottom:1px dotted rgba(148,163,184,.45);}
 .write-badge{font-size:9px;line-height:1;border:1px solid var(--bdr2);border-radius:999px;padding:3px 5px;color:var(--muted);background:var(--bg3);flex-shrink:0;}
-.write-badge.fw{border-color:#b45309;color:#fcd34d;background:#3a240b;}
+.write-badge.rpc{border-color:var(--rpc-bdr);color:var(--rpc-fg);background:var(--rpc-bg);}
+.write-badge.fw{border-color:var(--fw-bdr);color:var(--fw-fg);background:var(--fw-bg);}
 .snum{width:78px;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);
   padding:3px 5px;border-radius:3px;font-size:11px;text-align:right;}
 .snum:focus{outline:none;border-color:var(--a2);}
@@ -233,6 +244,12 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
 .td-term{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--dim);}
 .td-term input{width:72px;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);padding:3px 5px;border-radius:3px;font-size:11px;text-align:right;}
 .td-term input:focus{outline:none;border-color:var(--a2);}
+.mt2-timing-panel{border:1px solid var(--fw-bdr);background:rgba(58,36,11,.36);border-radius:5px;padding:8px 10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.mt2-timing-title{font-size:11px;color:var(--fw-fg);font-weight:700;}
+.mt2-timing-field{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--dim);}
+.mt2-timing-field input{width:72px;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);padding:3px 5px;border-radius:3px;font-size:11px;text-align:right;}
+.mt2-timing-field input:focus{outline:none;border-color:var(--a2);}
+.mt2-timing-help{font-size:10px;color:var(--muted);line-height:1.35;flex:1 1 320px;}
 @media (max-width: 900px){
   .td-state-grid{grid-template-columns:1fr 1fr;}
 }
@@ -453,6 +470,10 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
     <button class="btn rpc" id="write-rpc-btn" onclick="writeDeviceNow()" title="Writes the layer key bindings currently shown in the editor. Uses ZMK Studio RPC and does not rebuild firmware.">Write keymap (RPC)</button>
     <button class="btn firmware" id="write-firmware-btn" onclick="writeFullFirmwareNow()" title="Save all, build firmware, then copy the generated UF2 to the bootloader drive.">Write firmware (UF2)</button>
   </div>
+  <div class="write-hint" title="Changed outline color shows how the change reaches the MCU.">
+    <span class="rpc">RPC</span>
+    <span class="fw">UF2</span>
+  </div>
   <span class="unsaved d-none" id="unsaved-dot" title="Unsaved changes">*</span>
 </header>
 
@@ -593,6 +614,24 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
     <span style="color:var(--dim);font-size:11px">タップダンスの設定 (td0〜td31) — Save All で keymap に書き込まれます</span>
     <button class="btn sm blue" onclick="importMt2FromKeymap()">Import legacy &amp;mt2</button>
   </div>
+  <div style="padding:8px 14px 0;flex-shrink:0;">
+    <div class="mt2-timing-panel" id="mt2-timing-panel">
+      <span class="mt2-timing-title">mt2: mod_tap2 <span class="write-badge fw">UF2</span></span>
+      <label class="mt2-timing-field" title="この時間以内に離したら tap 側、超えたら hold 側として扱われます。長くすると O を押したつもりなのに - になる誤判定を減らしやすいです。">
+        Tap/Hold 判定
+        <input type="number" id="mt2-tapping-term" min="50" max="1000" oninput="setMt2TimingField('tapping_term',this.value,false)" onchange="setMt2TimingField('tapping_term',this.value,true)">
+        ms
+      </label>
+      <label class="mt2-timing-field" title="同じキーをすぐ押し直した時に tap を優先する猶予です。リピート気味に O を打つ時の tap 安定に影響します。0 で無効寄りです。">
+        連続 tap 優先
+        <input type="number" id="mt2-quick-tap" min="0" max="1000" oninput="setMt2TimingField('quick_tap',this.value,false)" onchange="setMt2TimingField('quick_tap',this.value,true)">
+        ms
+      </label>
+      <div class="mt2-timing-help">
+        `&mt2 MINUS O` など、キーマップ上の全 `&mt2` に効く設定です。短く押すと O、長く押すと - です。O のつもりで - が出る時は、まず Tap/Hold 判定を長めにしてください。TD0/TD1 の Tapping Term とは別で、変更は Save All 後に Write firmware (UF2) が必要です。
+      </div>
+    </div>
+  </div>
   <div class="td-layout">
     <div class="td-list-panel" id="td-list-panel"></div>
     <div class="td-detail-panel" id="td-detail-panel">
@@ -726,7 +765,7 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
         <input type="text" id="td-double-tap" style="width:100%;background:var(--bg);border:1px solid var(--bdr2);color:var(--text);padding:4px 6px;border-radius:3px;font-size:11px;" placeholder="Example: &kp ESCAPE / &bt BT_SEL 0">
       </div>
     </div>
-    <div style="font-size:10px;color:var(--dim);margin-bottom:8px">Single Tap / Single Hold / Double Tap の 3 状態で任意の binding を設定できます。Quantum の modified key を選んだ場合は追加キーまで選択してください。再帰防止のため &amp;tdN は設定できません。</div>
+    <div style="font-size:10px;color:var(--dim);margin-bottom:8px">Single Tap / Single Hold / Double Tap の 3 状態で任意の binding を設定できます。Quantum の modified key を選んだ場合は追加キーまで選択してください。再帰防止のため &amp;tdN は設定できません。ここでの Tapping Term はこの TD スロット専用で、上部の &amp;mt2 Tap/Hold 判定とは別です。</div>
     <div class="frow">
       <label>Tapping Term (ms)</label>
       <input type="number" id="mt-term" value="200" min="50" max="1000">
@@ -1102,6 +1141,17 @@ function bindingClass(raw){
 
 // 笏笏 TD 笏笏
 function tdEmpty(){ return {single_tap:'',single_hold:'',double_tap:'',tapping_term:200,display_name:''}; }
+function mt2TimingDefault(){ return {tapping_term:200,quick_tap:200}; }
+function normalizeMt2Timing(timing){
+  const base=mt2TimingDefault();
+  const src=timing||{};
+  ['tapping_term','quick_tap'].forEach(key=>{
+    let value=parseInt(src[key],10);
+    if(Number.isNaN(value)) value=base[key];
+    base[key]=Math.max(key==='quick_tap'?0:50,Math.min(1000,value));
+  });
+  return base;
+}
 function normalizeTdBinding(raw){
   const s=(raw||'').trim();
   if(!s) return '';
@@ -1583,6 +1633,7 @@ const state={
   combos:[],
   conditionalLayers:[],
   tdDefs:Array.from({length:TD_COUNT},()=>tdEmpty()),
+  mt2Timing:mt2TimingDefault(),
   macroDefs:Array.from({length:MACRO_COUNT},(_,i)=>macroEmpty(i)),
   settingsMeta:{firmware_folder:'',per_folder_macros:{}},
   macroSelectedSlot:0,
@@ -1700,6 +1751,7 @@ function makeSavedSnapshot(){
     combos:deepClone(state.combos||[]),
     conditionalLayers:deepClone(state.conditionalLayers||[]),
     tdDefs:deepClone(state.tdDefs||[]),
+    mt2Timing:deepClone(state.mt2Timing||mt2TimingDefault()),
     macroDefs:deepClone(state.macroDefs||[]),
     tpConfigs:deepClone(state.tpConfigs||{left:{},right:{}}),
     mainConfig:deepClone(state.mainConfig||{}),
@@ -1726,6 +1778,12 @@ function isTdFieldChanged(index, field){
   const cur=state.tdDefs?.[index]||tdEmpty();
   const saved=state.savedSnapshot?.tdDefs?.[index]||tdEmpty();
   return stableJson(cur[field])!==stableJson(saved[field]);
+}
+function isMt2TimingChanged(field=null){
+  const cur=normalizeMt2Timing(state.mt2Timing);
+  const saved=normalizeMt2Timing(state.savedSnapshot?.mt2Timing);
+  if(field) return stableJson(cur[field])!==stableJson(saved[field]);
+  return stableJson(cur)!==stableJson(saved);
 }
 function isComboChanged(index){ return stableJson(state.combos?.[index]||null)!==stableJson(state.savedSnapshot?.combos?.[index]||null); }
 function isConditionalChanged(index){ return stableJson(state.conditionalLayers?.[index]||null)!==stableJson(state.savedSnapshot?.conditionalLayers?.[index]||null); }
@@ -1993,7 +2051,7 @@ async function saveAll(opts={}){
     await api('/api/settings','POST',{td_definitions:state.tdDefs, macro_definitions:state.macroDefs});
     let tdModuleStatus='not_needed';
     if(state.layers.length){
-      const r=await api('/api/keymap','POST',{layers:state.layers, combos:state.combos, td_definitions:state.tdDefs, conditional_layers:state.conditionalLayers, macro_definitions:state.macroDefs});
+      const r=await api('/api/keymap','POST',{layers:state.layers, combos:state.combos, td_definitions:state.tdDefs, mt2_timing:state.mt2Timing, conditional_layers:state.conditionalLayers, macro_definitions:state.macroDefs});
       if(r.error){ setStatus(r.error,'s-err'); return false; }
       tdModuleStatus=r.td_module||tdModuleStatus;
     }
@@ -2113,17 +2171,21 @@ async function loadKeymap(){
   setStatus('Loading...');
   const data=await api('/api/keymap');
   if(data.error){ setStatus(data.error,'s-err'); document.getElementById('file-status').textContent=data.error; return; }
-  state.combos=data.combos||[];
-  state.conditionalLayers=data.conditional_layers||[];
-  state.tdDefs=data.td_definitions||state.tdDefs;
-  if(data.macro_definitions) state.macroDefs=hydrateMacroDefs(data.macro_definitions);
-  injectCustomPalette(data.custom_bindings||[]);
+  applyKeymapPayload(data);
   applyDisplayedKeymap(data.layers||[], {
     sourceLabel:data.path,
     statusText:'Loaded',
     statusClass:'s-ok',
     markAsSaved:true,
   });
+}
+function applyKeymapPayload(data){
+  state.combos=data.combos||[];
+  state.conditionalLayers=data.conditional_layers||[];
+  state.tdDefs=data.td_definitions||state.tdDefs;
+  state.mt2Timing=normalizeMt2Timing(data.mt2_timing);
+  if(data.macro_definitions) state.macroDefs=hydrateMacroDefs(data.macro_definitions);
+  injectCustomPalette(data.custom_bindings||[]);
 }
 function applyDisplayedKeymap(layers, opts={}){
   state.layers=deepClone(layers||[]);
@@ -2144,6 +2206,7 @@ async function exportDisplayedKeymap(){
     layers:state.layers,
     combos:state.combos,
     td_definitions:state.tdDefs,
+    mt2_timing:state.mt2Timing,
     conditional_layers:state.conditionalLayers,
     macro_definitions:state.macroDefs,
   });
@@ -2194,7 +2257,7 @@ function renderKeyboard(){
     const label=bindingLabel(b.raw),cls=bindingClass(b.raw);
     const el=document.createElement('div');
     el.className=`key ${cls}`; el.dataset.idx=idx;
-    if(isLayerBindingChanged(state.currentLayer,idx)) el.classList.add('changed-outline');
+    if(isLayerBindingChanged(state.currentLayer,idx)) el.classList.add('changed-outline','rpc');
     const mcTip=b.raw.match(MACRO_RE);
     const tdTip=b.raw.match(/^&td(\d+)$/);
     const layerTip=describeLayerBinding(b.raw);
@@ -2663,7 +2726,34 @@ function renderTdDetailPanel(){
   panel.appendChild(ft);
 }
 
+function renderMt2TimingPanel(){
+  const timing=normalizeMt2Timing(state.mt2Timing);
+  const panel=document.getElementById('mt2-timing-panel');
+  const term=document.getElementById('mt2-tapping-term');
+  const quick=document.getElementById('mt2-quick-tap');
+  if(!panel||!term||!quick) return;
+  if(document.activeElement!==term) term.value=timing.tapping_term;
+  if(document.activeElement!==quick) quick.value=timing.quick_tap;
+  syncMt2TimingChangedState();
+}
+function syncMt2TimingChangedState(){
+  const panel=document.getElementById('mt2-timing-panel');
+  const term=document.getElementById('mt2-tapping-term');
+  const quick=document.getElementById('mt2-quick-tap');
+  if(!panel||!term||!quick) return;
+  term.classList.toggle('changed-outline',isMt2TimingChanged('tapping_term'));
+  quick.classList.toggle('changed-outline',isMt2TimingChanged('quick_tap'));
+  panel.classList.toggle('changed-outline-inset',isMt2TimingChanged());
+}
+function setMt2TimingField(field,value,commit=false){
+  const next={...(state.mt2Timing||mt2TimingDefault()),[field]:String(value??'').trim()};
+  state.mt2Timing=commit ? normalizeMt2Timing(next) : next;
+  markUnsaved();
+  if(commit) renderMt2TimingPanel();
+  else syncMt2TimingChangedState();
+}
 function renderModTapTab(){
+  renderMt2TimingPanel();
   renderTdListPanel();
   renderTdDetailPanel();
 }
@@ -3108,7 +3198,7 @@ function renderTpGestureKeys(){
     const lbl=document.createElement('span'); lbl.className='gest-label'; lbl.textContent=TP_GESTURE_LABELS[i]||`繧ｸ繧ｧ繧ｹ繝√Ε繝ｼ ${i+1}`;
     lbl.textContent=`${meta.slot}: ${meta.label}`;
     const keyEl=document.createElement('div'); keyEl.className=`gest-key ${bindingClass(b.raw)}`; keyEl.textContent=bindingLabel(b.raw); keyEl.title=b.raw;
-    if(isLayerBindingChanged(state.currentLayer,keyIdx)) keyEl.classList.add('changed-outline');
+    if(isLayerBindingChanged(state.currentLayer,keyIdx)) keyEl.classList.add('changed-outline','rpc');
     item.appendChild(lbl); item.appendChild(keyEl);
     const applyGestureBinding=(raw)=>{
       setBinding(keyIdx,raw);
@@ -3234,7 +3324,7 @@ function renderTpNavBindings(rowEl,cfgObj){
     const btn=document.createElement('button'); btn.className=`nav-binding-btn ${bindingClass(raw)}`;
     btn.textContent=bindingLabel(raw); btn.title=raw; btn.disabled=!enabled;
     const keyIdx=TP_CLUSTER[state.tpSide][direction==='right'?3:4];
-    if(isLayerBindingChanged(state.currentLayer,keyIdx)) btn.classList.add('changed-outline');
+    if(isLayerBindingChanged(state.currentLayer,keyIdx)) btn.classList.add('changed-outline','rpc');
     btn.onclick=()=>editTpNavBinding(direction,btn);
     pair.appendChild(dir); pair.appendChild(btn); controls.appendChild(pair);
   });
@@ -5179,11 +5269,7 @@ async function init(){
   renderPalette();
   const r=await api('/api/keymap');
   if(!r.error){
-    state.combos=r.combos||[];
-    state.conditionalLayers=r.conditional_layers||[];
-    state.tdDefs=r.td_definitions||state.tdDefs;
-    if(r.macro_definitions) state.macroDefs=hydrateMacroDefs(r.macro_definitions);
-    injectCustomPalette(r.custom_bindings||[]);
+    applyKeymapPayload(r);
     applyDisplayedKeymap(r.layers||[], {
       sourceLabel:r.path,
       statusText:'Loaded',

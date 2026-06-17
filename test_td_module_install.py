@@ -73,6 +73,55 @@ class TDModuleInstallTests(unittest.TestCase):
             'td_definitions': td_definitions,
         })
 
+    def _write_keymap_with_mt2(self, tapping_term=345, quick_tap=123):
+        with open(self.keymap_path, 'w', encoding='utf-8', newline='\n') as f:
+            f.write(
+                '/ {\n'
+                '    behaviors {\n'
+                '        mt2: mod_tap2 {\n'
+                '            compatible = "zmk,behavior-hold-tap";\n'
+                '            #binding-cells = <2>;\n'
+                f'            tapping-term-ms = <{tapping_term}>;\n'
+                f'            quick-tap-ms = <{quick_tap}>;\n'
+                '            bindings = <&kp>, <&kp>;\n'
+                '        };\n'
+                '    };\n'
+                '    keymap {\n'
+                '        compatible = "zmk,keymap";\n'
+                '        default_layer { bindings = <&kp A>; };\n'
+                '    };\n'
+                '};\n'
+            )
+
+    def test_keymap_get_uses_config_mt2_timing(self):
+        settings = editor.load_settings()
+        settings['mt2_timing'] = {'tapping_term': 999, 'quick_tap': 999}
+        editor.save_settings_file(settings)
+        self._write_keymap_with_mt2(345, 123)
+
+        response = self.client.get('/api/keymap')
+        payload = response.get_json()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload['mt2_timing'], {'tapping_term': 345, 'quick_tap': 123})
+
+    def test_keymap_save_persists_mt2_timing_to_config_keymap(self):
+        self._write_keymap_with_mt2(200, 200)
+        response = self.client.post('/api/keymap', json={
+            'layers': [],
+            'combos': [],
+            'conditional_layers': [],
+            'macro_definitions': [],
+            'td_definitions': editor.normalize_td_definitions([]),
+            'mt2_timing': {'tapping_term': 360, 'quick_tap': 90},
+        })
+
+        self.assertEqual(response.status_code, 200)
+        content = editor._read_text_file(self.keymap_path)
+        self.assertIn('tapping-term-ms = <360>;', content)
+        self.assertIn('quick-tap-ms = <90>;', content)
+        self.assertNotIn('mt2_timing', editor.load_settings())
+
     def test_td_not_used_skips_module_install(self):
         response = self._save_keymap(editor.normalize_td_definitions([]))
         payload = response.get_json()

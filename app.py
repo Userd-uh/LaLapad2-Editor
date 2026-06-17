@@ -93,6 +93,10 @@ _TD_EMPTY = {
     'tapping_term': 200,
     'display_name': '',
 }
+_MT2_TIMING_DEFAULT = {
+    'tapping_term': 200,
+    'quick_tap': 200,
+}
 TD_MACRO_CONTROL_BEHAVIORS = {
     'macro_tap', 'macro_press', 'macro_release', 'macro_pause_for_release',
     'macro_wait_time', 'macro_tap_time',
@@ -213,6 +217,19 @@ def normalize_td_definition(item):
         }
     result['tapping_term'] = max(50, min(1000, result['tapping_term']))
     result['display_name'] = str(item.get('display_name', '') or '').strip()
+    return result
+
+
+def normalize_mt2_timing(item):
+    item = item or {}
+    result = dict(_MT2_TIMING_DEFAULT)
+    for key in ('tapping_term', 'quick_tap'):
+        try:
+            raw_value = item.get(key, result[key])
+            value = result[key] if raw_value in (None, '') else int(raw_value)
+        except (TypeError, ValueError):
+            value = result[key]
+        result[key] = max(0, min(1000, value))
     return result
 
 
@@ -477,6 +494,7 @@ def normalize_settings(settings):
         td_defs = normalized.get('td_definitions')
     normalized['td_definitions'] = normalize_td_definitions(td_defs)
     normalized.pop('mt_definitions', None)
+    normalized.pop('mt2_timing', None)
     normalized['macro_definitions'] = normalize_macro_definitions(raw.get('macro_definitions'))
     normalized['per_folder_macros'] = normalize_per_folder_macros(raw.get('per_folder_macros'))
     return normalized
@@ -509,6 +527,8 @@ def discover_files(folder):
     Returns a dict with keymap_path, main_conf_path, left/right_conf_path,
     and keyboard_name. Unknown paths are empty strings."""
     folder = norm(folder)
+    if os.path.basename(folder).lower() == 'config':
+        folder = os.path.dirname(folder)
     result = {
         'firmware_folder': folder,
         'keymap_path': '',
@@ -924,6 +944,26 @@ def extract_td_definitions(content):
         }
 
     return defs
+
+
+def extract_mt2_timing(content):
+    timing = dict(_MT2_TIMING_DEFAULT)
+    span = find_block_span(content, 'behaviors')
+    if not span:
+        return timing
+    _, _, body_start, body_end = span
+    body = content[body_start:body_end]
+    match = re.search(r'^\s*mt2\s*:\s*\w+\s*\{(.*?)^\s*\};', body, re.MULTILINE | re.DOTALL)
+    if not match:
+        return timing
+    node_body = match.group(1)
+    term_match = re.search(r'tapping-term-ms\s*=\s*<([^>]*)>', node_body)
+    quick_match = re.search(r'quick-tap-ms\s*=\s*<([^>]*)>', node_body)
+    if term_match:
+        timing['tapping_term'] = term_match.group(1).strip()
+    if quick_match:
+        timing['quick_tap'] = quick_match.group(1).strip()
+    return normalize_mt2_timing(timing)
 
 
 def _step_from_macro_binding(entry):
@@ -1366,8 +1406,36 @@ def update_conditional_layers(original, conditional_layers):
     return original[:root_end] + '\n\n' + new_block + '\n' + original[root_end:]
 
 
+def _replace_or_insert_node_prop(node_text, prop_name, prop_value):
+    prop_line = f'            {prop_name} = <{prop_value}>;'
+    pattern = re.compile(rf'^(\s*){re.escape(prop_name)}\s*=\s*<[^>]*>;', re.MULTILINE)
+    if pattern.search(node_text):
+        return pattern.sub(lambda m: f'{m.group(1)}{prop_name} = <{prop_value}>;', node_text, count=1)
+    bindings_match = re.search(r'^\s*bindings\s*=', node_text, re.MULTILINE)
+    if bindings_match:
+        return node_text[:bindings_match.start()] + prop_line + '\n' + node_text[bindings_match.start():]
+    return node_text.rstrip() + '\n' + prop_line + '\n'
+
+
+def update_mt2_timing(original, mt2_timing):
+    timing = normalize_mt2_timing(mt2_timing)
+    span = find_block_span(original, 'behaviors')
+    if not span:
+        return original
+    _, _, body_start, body_end = span
+    body = original[body_start:body_end]
+    match = re.search(r'^\s*mt2\s*:\s*\w+\s*\{(.*?)^\s*\};', body, re.MULTILINE | re.DOTALL)
+    if not match:
+        return original
+    node = body[match.start():match.end()]
+    node = _replace_or_insert_node_prop(node, 'tapping-term-ms', timing['tapping_term'])
+    node = _replace_or_insert_node_prop(node, 'quick-tap-ms', timing['quick_tap'])
+    new_body = body[:match.start()] + node + body[match.end():]
+    return original[:body_start] + new_body + original[body_end:]
+
+
 def update_keymap(original, layers, combos=None, td_definitions=None,
-                   conditional_layers=None, macro_definitions=None):
+                   conditional_layers=None, macro_definitions=None, mt2_timing=None):
     result = original
     keymap_span = find_block_span(result, 'keymap')
     if keymap_span:
@@ -1392,6 +1460,8 @@ def update_keymap(original, layers, combos=None, td_definitions=None,
     result = update_tap_dance_nodes(result, td_definitions)
     result = update_macro_nodes(result, macro_definitions)
     result = update_conditional_layers(result, conditional_layers)
+    if mt2_timing is not None:
+        result = update_mt2_timing(result, mt2_timing)
     return result
 
 
@@ -1558,6 +1628,7 @@ def api_keymap():
             'combos': extract_combos(content),
             'conditional_layers': extract_conditional_layers(content),
             'td_definitions': td_definitions,
+            'mt2_timing': extract_mt2_timing(content),
             'macro_definitions': macro_definitions,
             'custom_bindings': custom,
             'defines': defines,
@@ -1570,6 +1641,7 @@ def api_keymap():
     original = _read_text_file(path)
     payload = request.json or {}
     td_definitions = payload.get('td_definitions', s.get('td_definitions', []))
+    mt2_timing = payload.get('mt2_timing')
     td_module_status = 'not_needed'
     td_module_plan = None
     try:
@@ -1581,6 +1653,7 @@ def api_keymap():
             td_definitions,
             payload.get('conditional_layers', []),
             macro_definitions,
+            mt2_timing,
         )
         if td_definitions_require_module(td_definitions):
             td_module_plan = plan_td_module_install(s.get('firmware_folder', ''))
@@ -1621,6 +1694,7 @@ def api_keymap_export():
             payload.get('td_definitions', s.get('td_definitions', [])),
             payload.get('conditional_layers', []),
             payload.get('macro_definitions', s.get('macro_definitions', [])),
+            payload.get('mt2_timing'),
         )
     except Exception as e:
         return jsonify({'error': str(e)}), 500
