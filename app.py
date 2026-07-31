@@ -722,6 +722,18 @@ def extract_layers(content):
     return layers
 
 
+def find_unresolved_device_behaviors(layers):
+    """Return unresolved MCU behavior placeholders that must never reach a keymap file."""
+    unresolved = set()
+    for layer in layers or []:
+        for binding in layer.get('bindings', []) or []:
+            raw = str(binding.get('raw', '') or '').strip()
+            match = re.match(r'^&(behavior_\d+)(?:\s|$)', raw)
+            if match:
+                unresolved.add('&' + match.group(1))
+    return sorted(unresolved)
+
+
 def extract_custom_bindings(content):
     """Collect unique custom bindings from local definitions and non-built-in usages."""
     seen = set()
@@ -1640,6 +1652,14 @@ def api_keymap():
         return jsonify({'error': 'キーマップパスが無効'}), 400
     original = _read_text_file(path)
     payload = request.json or {}
+    unresolved = find_unresolved_device_behaviors(payload.get('layers', []))
+    if unresolved:
+        return jsonify({
+            'error': (
+                'MCUから取得したBehavior IDをkeymap名へ解決できないため保存を中止しました: '
+                + ', '.join(unresolved)
+            )
+        }), 400
     td_definitions = payload.get('td_definitions', s.get('td_definitions', []))
     mt2_timing = payload.get('mt2_timing')
     td_module_status = 'not_needed'
@@ -1687,6 +1707,14 @@ def api_keymap_export():
     try:
         original = _read_text_file(path)
         payload = request.json or {}
+        unresolved = find_unresolved_device_behaviors(payload.get('layers', []))
+        if unresolved:
+            return jsonify({
+                'error': (
+                    'MCUから取得したBehavior IDをkeymap名へ解決できないためエクスポートを中止しました: '
+                    + ', '.join(unresolved)
+                )
+            }), 400
         content = update_keymap(
             original,
             payload.get('layers', []),
