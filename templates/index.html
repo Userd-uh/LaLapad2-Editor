@@ -31,6 +31,12 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
 .btn:hover{background:var(--khov);}
 .btn:disabled{opacity:.45;cursor:not-allowed;}
 .btn:disabled:hover{background:var(--bg3);}
+.btn.usb-connected{border-color:var(--ok);box-shadow:0 0 0 2px rgba(52,211,153,.24);color:#a7f3d0;}
+.unavailable-action{position:relative;display:inline-flex;}
+.unavailable-action .btn{filter:grayscale(1);padding-right:34px;}
+.unavailable-action::after{content:'不可';position:absolute;right:6px;top:50%;transform:translateY(-50%);
+  padding:1px 4px;border-radius:3px;background:#334155;color:#e2e8f0;font-size:9px;font-weight:700;
+  line-height:1.35;pointer-events:none;}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#06261f;}
 .btn.primary:hover{background:#7df4df;}
 .btn.blue{background:var(--a3);border-color:var(--a3);}
@@ -44,7 +50,9 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
 .btn.firmware{border-color:var(--fw-bdr);background:var(--fw-bg);color:var(--fw-fg);}
 .btn.firmware:hover{background:#5a3308;}
 .unsaved{color:var(--warn);font-size:18px;line-height:1;}
-.write-hint{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--muted);}
+.write-hint{display:flex;flex-direction:column;align-items:flex-start;gap:2px;font-size:10px;color:var(--muted);line-height:1.25;}
+.write-hint-label{color:var(--dim);white-space:nowrap;}
+.write-hint-items{display:flex;align-items:center;gap:6px;}
 .write-hint span{display:inline-flex;align-items:center;gap:3px;white-space:nowrap;}
 .write-hint span::before{content:'';width:8px;height:8px;border-radius:2px;border:1px solid currentColor;}
 .write-hint .rpc{color:var(--rpc-fg);}
@@ -464,15 +472,15 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
     <span class="toolbar-label">Run</span>
     <button class="btn" id="connect-usb-btn" onclick="connectDevice('usb')" title="Open the USB serial picker and connect through ZMK Studio RPC.">Connect USB</button>
     <button class="btn" id="disconnect-btn" onclick="disconnectDevice()" title="Close the current MCU connection.">Disconnect</button>
-    <button class="btn" id="connect-ble-btn" onclick="connectDevice('ble')" title="Connect through Web Bluetooth and ZMK Studio RPC.">Connect Bluetooth</button>
+    <span class="unavailable-action" title="現在、エディターからのBluetooth接続は使用できません。"><button class="btn" id="connect-ble-btn" disabled aria-disabled="true">Connect Bluetooth</button></span>
     <button class="btn" id="load-device-btn" onclick="loadKeymapFromDevice()" title="Read the connected MCU keymap through ZMK Studio RPC and show it in the editor.">Load from MCU</button>
     <button class="btn" id="export-keymap-btn" onclick="exportDisplayedKeymap()" title="Export the keymap currently shown in the editor.">Export keymap</button>
     <button class="btn rpc" id="write-rpc-btn" onclick="writeDeviceNow()" title="Writes the layer key bindings currently shown in the editor. Uses ZMK Studio RPC and does not rebuild firmware.">Write keymap (RPC)</button>
-    <button class="btn firmware" id="write-firmware-btn" onclick="writeFullFirmwareNow()" title="Save all, build firmware, then copy the generated UF2 to the bootloader drive.">Write firmware (UF2)</button>
+    <span class="unavailable-action" title="現在、エディターからのファームウェア書き込みは使用できません。"><button class="btn firmware" id="write-firmware-btn" disabled aria-disabled="true">Write firmware (UF2)</button></span>
   </div>
   <div class="write-hint" title="Changed outline color shows how the change reaches the MCU.">
-    <span class="rpc">RPC</span>
-    <span class="fw">UF2</span>
+    <div class="write-hint-label">変更枠：実機への反映方法</div>
+    <div class="write-hint-items"><span class="rpc">青 = RPCで反映</span><span class="fw">オレンジ = ファームウェア書込が必要</span></div>
   </div>
   <span class="unsaved d-none" id="unsaved-dot" title="Unsaved changes">*</span>
 </header>
@@ -1758,11 +1766,23 @@ function makeSavedSnapshot(){
   };
 }
 function resetSavedSnapshot(scope='all', side=null){
-  if(!state.savedSnapshot || scope==='all') state.savedSnapshot=makeSavedSnapshot();
-  else if(scope==='layers') state.savedSnapshot.layers=deepClone(state.layers||[]);
+  if(!state.savedSnapshot || scope==='all'){
+    state.savedSnapshot=makeSavedSnapshot();
+    state.fileSavedSnapshot=deepClone(state.savedSnapshot);
+  }
+  else if(scope==='layers'){
+    state.savedSnapshot.layers=deepClone(state.layers||[]);
+    if(state.fileSavedSnapshot) state.fileSavedSnapshot.layers=deepClone(state.layers||[]);
+  }
   else if(scope==='config'){
-    if(side==='main') state.savedSnapshot.mainConfig=deepClone(state.mainConfig||{});
-    else if(side) state.savedSnapshot.tpConfigs[side]=deepClone(state.tpConfigs[side]||{});
+    if(side==='main'){
+      state.savedSnapshot.mainConfig=deepClone(state.mainConfig||{});
+      if(state.fileSavedSnapshot) state.fileSavedSnapshot.mainConfig=deepClone(state.mainConfig||{});
+    }
+    else if(side){
+      state.savedSnapshot.tpConfigs[side]=deepClone(state.tpConfigs[side]||{});
+      if(state.fileSavedSnapshot) state.fileSavedSnapshot.tpConfigs[side]=deepClone(state.tpConfigs[side]||{});
+    }
   }
   state.baselineLayers=deepClone(state.savedSnapshot.layers||[]);
 }
@@ -1839,8 +1859,9 @@ function setRowNumericValue(row, cfgObj, value){
   return next;
 }
 function hasUnsavedChanges(){
-  if(!state.savedSnapshot) return false;
-  return stableJson(makeSavedSnapshot())!==stableJson(state.savedSnapshot);
+  const fileSnapshot=state.fileSavedSnapshot||state.savedSnapshot;
+  if(!fileSnapshot) return false;
+  return stableJson(makeSavedSnapshot())!==stableJson(fileSnapshot);
 }
 function refreshUnsavedUi(){
   state.unsaved=hasUnsavedChanges();
@@ -4323,10 +4344,17 @@ function updateDevicePanel(){
   const label=document.getElementById('device-label');
   const rt=document.getElementById('device-realtime');
   const disconnectBtn=document.getElementById('disconnect-btn');
+  const usbBtn=document.getElementById('connect-usb-btn');
   if(transport) transport.textContent=state.device.mode||'-';
   if(label) label.textContent=state.device.label||'-';
   if(rt) rt.checked=!!state.device.realtime;
   if(disconnectBtn) disconnectBtn.disabled=!state.device.conn;
+  if(usbBtn){
+    const usbConnected=!!state.device.conn && state.device.mode==='usb';
+    usbBtn.classList.toggle('usb-connected',usbConnected);
+    usbBtn.textContent=usbConnected?'USB Connected':'Connect USB';
+    usbBtn.setAttribute('aria-pressed',usbConnected?'true':'false');
+  }
   refreshUsbDiag();
 }
 function setDeviceRealtime(value){
@@ -5249,10 +5277,16 @@ async function writeFullFirmwareNow(){
 }
 async function saveFilesBeforeDeviceWrite(){
   const deviceBaseline=deepClone(state.baselineLayers||[]);
+  const pendingWriteSnapshot=deepClone(state.savedSnapshot||makeSavedSnapshot());
   setStatus('Saving .keymap before RPC write...');
   const saved=await saveAll({quiet:true,skipRealtime:true});
   if(!saved) return false;
+  // Save All writes every editor section to disk, but RPC only applies layer bindings.
+  // Restore the pre-save comparison baseline so firmware-only changes remain orange.
+  state.savedSnapshot=pendingWriteSnapshot;
   state.baselineLayers=deviceBaseline;
+  refreshUnsavedUi();
+  refreshChangedHighlights();
   deviceLog('Saved editor files before RPC keymap write.');
   return true;
 }
