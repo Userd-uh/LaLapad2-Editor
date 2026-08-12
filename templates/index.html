@@ -574,6 +574,18 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
       <p class="device-note" style="margin-top:10px">
         ヘッダーの MCU 操作は実行ボタンです。Load from MCU / Write keymap (RPC) はレイヤーのキー割当だけをZMK Studio RPCで読み書きします。トラックパッドやドライバー設定などの .conf/Kconfig 情報はファイル保存 + firmware 書き込みの対象です。
       </p>
+      <div class="device-row" style="margin-top:10px">
+        <label for="primary-side-select" style="font-size:12px;font-weight:600">Primary half</label>
+        <select id="primary-side-select" aria-label="Primary half">
+          <option value="left">Left</option>
+          <option value="right">Right</option>
+        </select>
+        <button class="btn blue" id="apply-primary-side-btn" onclick="applyPrimarySide()">Apply primary switch</button>
+        <span id="primary-side-status" style="font-size:11px;color:var(--dim)">Detecting firmware setting...</span>
+      </div>
+      <p class="device-note" style="margin-top:6px">
+        Primary変更は central と Studio USB RPC の対象を同時に切り替えます。実機への反映は下の手順ログを確認し、left/right UF2 を両方書き込んでください。
+      </p>
       <div class="firmware-grid">
         <label>Build command</label>
         <input type="text" id="fw-build-command" placeholder='例: west build -p -d build/right -b seeeduino_xiao_ble -- -DSHIELD="lalapadgen2_right rgbled_adapter" -DZMK_CONFIG="{config_dir}"'>
@@ -5234,6 +5246,55 @@ async function refreshFirmwareStatus(){
     setStatus('Firmware status error: '+(e?.message||String(e)),'s-err');
   }
 }
+function setPrimarySideStatus(primary){
+  const select=document.getElementById('primary-side-select');
+  const status=document.getElementById('primary-side-status');
+  if(select) select.value=primary||'left';
+  if(status) status.textContent=primary ? `Current firmware primary: ${primary}` : 'Primary setting unavailable';
+}
+function logPrimarySwitchInstructions(lines=[]){
+  lines.forEach(line=>deviceLog(line));
+}
+async function refreshPrimarySide({logInstructions=false}={}){
+  try{
+    const res=await api('/api/firmware/primary');
+    if(res.error){
+      const status=document.getElementById('primary-side-status');
+      if(status) status.textContent='Primary setting unavailable';
+      return false;
+    }
+    setPrimarySideStatus(res.primary);
+    if(logInstructions) logPrimarySwitchInstructions(res.instructions||[]);
+    return true;
+  }catch(e){
+    const status=document.getElementById('primary-side-status');
+    if(status) status.textContent='Primary setting unavailable';
+    return false;
+  }
+}
+async function applyPrimarySide(){
+  const select=document.getElementById('primary-side-select');
+  const target=select?.value;
+  if(target!=='left'&&target!=='right') return;
+  setStatus('Primary側の設定を適用しています...');
+  deviceLog(`Primary切替を要求しました: ${target}。`);
+  try{
+    const res=await api('/api/firmware/primary','POST',{primary:target});
+    if(res.error){
+      setStatus('Primary切替エラー: '+res.error,'s-err');
+      deviceLog('Primary切替エラー: '+res.error);
+      return;
+    }
+    setPrimarySideStatus(res.primary);
+    deviceLog(`Primary切替 ${res.changed?'適用':'確認'}: ${res.previous_primary} -> ${res.primary}。`);
+    logPrimarySwitchInstructions(res.instructions||[]);
+    setStatus(`Primaryは ${res.primary} です。手順ログに従って両側を書き込んでください。`, 's-warn');
+  }catch(e){
+    const message=e?.message||String(e);
+    setStatus('Primary切替エラー: '+message,'s-err');
+    deviceLog('Primary切替エラー: '+message);
+  }
+}
 async function buildFirmwareNow(){
   setStatus('Saving files before firmware build...');
   const saved=await saveAll({quiet:true,skipRealtime:true});
@@ -5340,6 +5401,7 @@ async function init(){
   } else { setStatus('Open settings and choose the firmware folder first.','s-warn'); }
   updateDevicePanel();
   ['left','right','main'].forEach(side=>loadConfig(side).catch(()=>{}));
+  refreshPrimarySide();
 }
 init();
 </script>

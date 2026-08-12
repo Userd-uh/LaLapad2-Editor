@@ -519,6 +519,189 @@ def norm(path):
 
 
 # ──────────────────────────────────────────────
+# Split primary-half configuration
+# ──────────────────────────────────────────────
+
+PRIMARY_SIDES = ('left', 'right')
+_PRIMARY_CONDITION_RE = re.compile(r'^if SHIELD_LALAPADGEN2_(LEFT|RIGHT)\s*$', re.MULTILINE)
+_CENTRAL_CONFIG_RE = re.compile(r'^config ZMK_SPLIT_ROLE_CENTRAL\s*$', re.MULTILINE)
+_BUILD_ENTRY_RE = re.compile(
+    r'(?ms)^\s*-\s+board:\s*seeeduino_xiao_ble\s*\r?\n.*?(?=^\s*-\s+board:|\Z)'
+)
+_BUILD_SHIELD_RE = re.compile(r'^\s*shield:\s*lalapadgen2_(left|right)(?:\s|$)', re.MULTILINE)
+_STUDIO_SNIPPET_RE = re.compile(r'^\s*snippet:\s*studio-rpc-usb-uart\s*\r?\n?', re.MULTILINE)
+
+
+def _primary_paths(firmware_folder, keyboard_name=''):
+    """Return the two firmware files that define the split central half."""
+    firmware_folder = norm(firmware_folder)
+    if not firmware_folder or not os.path.isdir(firmware_folder):
+        raise ValueError('firmware folder が未設定、または見つかりません。')
+    keyboard_name = str(keyboard_name or '').strip()
+    if not keyboard_name:
+        config_dir = os.path.join(firmware_folder, 'config')
+        keymaps = sorted(name for name in os.listdir(config_dir) if name.endswith('.keymap')) if os.path.isdir(config_dir) else []
+        if len(keymaps) != 1:
+            raise ValueError('primary の対象キーボードを一意に特定できません。')
+        keyboard_name = keymaps[0][:-7]
+    shield_dir = os.path.join(firmware_folder, 'config', 'boards', 'shields', keyboard_name)
+    paths = {
+        'kconfig': os.path.join(shield_dir, 'Kconfig.defconfig'),
+        'build': os.path.join(firmware_folder, 'build.yaml'),
+    }
+    missing = [path for path in paths.values() if not os.path.isfile(path)]
+    if missing:
+        raise ValueError('primary 切替に必要なファイルが見つかりません: ' + ', '.join(missing))
+    return paths
+
+
+def _primary_side_from_kconfig(content):
+    central_defs = list(_CENTRAL_CONFIG_RE.finditer(content))
+    if len(central_defs) != 1:
+        raise ValueError('ZMK_SPLIT_ROLE_CENTRAL の定義が一意ではありません。')
+    central = central_defs[0]
+    candidates = list(_PRIMARY_CONDITION_RE.finditer(content, 0, central.start()))
+    if not candidates:
+        raise ValueError('central 側の SHIELD 条件を特定できません。')
+    condition = candidates[-1]
+    if content.rfind('endif', condition.end(), central.start()) >= 0:
+        raise ValueError('central 側の SHIELD 条件が不正です。')
+    return condition.group(1).lower(), condition
+
+
+def _studio_side_from_build(content):
+    snippets = list(_STUDIO_SNIPPET_RE.finditer(content))
+    if len(snippets) != 1:
+        raise ValueError('studio-rpc-usb-uart の指定が一意ではありません。')
+    snippet = snippets[0]
+    for entry in _BUILD_ENTRY_RE.finditer(content):
+        if entry.start() <= snippet.start() < entry.end():
+            shield = _BUILD_SHIELD_RE.search(entry.group(0))
+            if shield:
+                return shield.group(1), snippet
+    raise ValueError('studio-rpc-usb-uart のビルド対象を特定できません。')
+
+
+def read_primary_configuration(firmware_folder, keyboard_name=''):
+    """Inspect the compiled split role and the Studio build target without writing."""
+    paths = _primary_paths(firmware_folder, keyboard_name)
+    kconfig = _read_text_file(paths['kconfig'])
+    build = _read_text_file(paths['build'])
+    primary, _ = _primary_side_from_kconfig(kconfig)
+    studio_side, _ = _studio_side_from_build(build)
+    if studio_side != primary:
+        raise ValueError('central 側と studio-rpc-usb-uart のビルド対象が一致していません。')
+    return {'primary': primary, 'paths': paths}
+
+
+def _update_kconfig_primary(content, target):
+    current, condition = _primary_side_from_kconfig(content)
+    if current == target:
+        return content
+    return content[:condition.start(1)] + target.upper() + content[condition.end(1):]
+
+
+def _update_build_primary(content, current, target):
+    studio_side, _ = _studio_side_from_build(content)
+    if studio_side != current:
+        raise ValueError('Studio のビルド対象と現在の primary が一致していません。')
+    replacements = []
+    found_sides = set()
+    newline = '\r\n' if '\r\n' in content else '\n'
+    for entry in _BUILD_ENTRY_RE.finditer(content):
+        entry_text = entry.group(0)
+        shield = _BUILD_SHIELD_RE.search(entry_text)
+        if not shield:
+            continue
+        side = shield.group(1)
+        found_sides.add(side)
+        entry_text = _STUDIO_SNIPPET_RE.sub('', entry_text)
+        if side == target:
+            shield_after_remove = _BUILD_SHIELD_RE.search(entry_text)
+            if not shield_after_remove:
+                raise ValueError('primary 側の shield ビルド定義が不正です。')
+            line_end = entry_text.find('\n', shield_after_remove.end())
+            insert_at = len(entry_text) if line_end < 0 else line_end + 1
+            entry_text = entry_text[:insert_at] + f'    snippet: studio-rpc-usb-uart{newline}' + entry_text[insert_at:]
+        replacements.append((entry.start(), entry.end(), entry_text))
+    if found_sides != set(PRIMARY_SIDES):
+        raise ValueError('left/right の両方の firmware build 定義が見つかりません。')
+    result = content
+    for start, end, replacement in reversed(replacements):
+        result = result[:start] + replacement + result[end:]
+    studio_after, _ = _studio_side_from_build(result)
+    if studio_after != target:
+        raise ValueError('Studio のビルド対象を更新できませんでした。')
+    return result
+
+
+def _atomic_replace_text_files(changes):
+    """Replace local files as a rollback-capable group; validate everything before this call."""
+    originals = {}
+    prepared = []
+    backups = []
+    replaced = []
+    try:
+        for path, content in changes.items():
+            if _wsl_unc_to_native(path):
+                raise ValueError('WSL UNC パスでは primary 切替を安全に原子的適用できません。ローカルパスを指定してください。')
+            originals[path] = _read_text_file(path)
+            directory = os.path.dirname(path)
+            fd, temp_path = tempfile.mkstemp(prefix='.lalapad-primary-', suffix='.tmp', dir=directory, text=True)
+            with os.fdopen(fd, 'w', encoding='utf-8', newline='') as f:
+                f.write(content)
+            prepared.append((path, temp_path))
+            fd, backup_path = tempfile.mkstemp(prefix='.lalapad-primary-', suffix='.bak', dir=directory, text=True)
+            with os.fdopen(fd, 'w', encoding='utf-8', newline='') as f:
+                f.write(originals[path])
+            backups.append((path, backup_path))
+        for path, temp_path in prepared:
+            os.replace(temp_path, path)
+            replaced.append(path)
+        prepared.clear()
+    except Exception:
+        backup_by_path = dict(backups)
+        for path in reversed(replaced):
+            backup_path = backup_by_path.get(path)
+            if backup_path and os.path.exists(backup_path):
+                try:
+                    os.replace(backup_path, path)
+                except OSError:
+                    pass
+        raise
+    finally:
+        for _, temp_path in prepared + backups:
+            try:
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+            except OSError:
+                pass
+
+
+def switch_primary_configuration(firmware_folder, target, keyboard_name=''):
+    """Move central role and Studio snippet together, or leave both source files untouched."""
+    target = str(target or '').lower()
+    if target not in PRIMARY_SIDES:
+        raise ValueError('primary は left または right を指定してください。')
+    info = read_primary_configuration(firmware_folder, keyboard_name)
+    current = info['primary']
+    if current == target:
+        return {**info, 'previous_primary': current, 'changed': False}
+    kconfig = _read_text_file(info['paths']['kconfig'])
+    build = _read_text_file(info['paths']['build'])
+    updated_kconfig = _update_kconfig_primary(kconfig, target)
+    updated_build = _update_build_primary(build, current, target)
+    # Re-parse both drafts before replacing either file.
+    if _primary_side_from_kconfig(updated_kconfig)[0] != target or _studio_side_from_build(updated_build)[0] != target:
+        raise ValueError('primary 切替後の設定検証に失敗しました。')
+    _atomic_replace_text_files({
+        info['paths']['kconfig']: updated_kconfig,
+        info['paths']['build']: updated_build,
+    })
+    return {**info, 'primary': target, 'previous_primary': current, 'changed': True}
+
+
+# ──────────────────────────────────────────────
 # File discovery
 # ──────────────────────────────────────────────
 
@@ -611,6 +794,27 @@ def _list_flash_targets():
     return targets
 
 
+def _primary_switch_instructions(previous_primary, primary, changed):
+    previous_label = '左側' if previous_primary == 'left' else '右側'
+    primary_label = '左側' if primary == 'left' else '右側'
+    change_line = (
+        f'1/8 primary を {previous_label} から {primary_label} に変更しました。'
+        if changed else
+        f'1/8 primary はすでに{primary_label}です。設定ファイルは変更していません。'
+    )
+    return [
+        change_line + ' GitHub Actionsまたはローカルビルドで settings_reset / right / left UF2を生成してください。',
+        '2/8 settings_reset UF2 を物理的な右側へ書き込みます（RSTを2回でUF2ドライブを表示）。',
+        '3/8 settings_reset UF2 を物理的な左側へ書き込みます。',
+        '4/8 新しい right UF2 を物理的な右側へ書き込みます。',
+        '5/8 新しい left UF2 を物理的な左側へ書き込みます。',
+        '6/8 両方をほぼ同時に再起動します。',
+        '7/8 Windowsの既存Bluetooth登録を削除してから、キーボードを再ペアリングします。',
+        '8/8 USB接続とZMK Studioは、新しいprimaryである右側へ接続します。',
+        '警告: settings_reset はBluetooth・splitペアリングとRGBを含む永続設定を消去します。',
+    ]
+
+
 @app.route('/api/firmware/status', methods=['GET'])
 def api_firmware_status():
     s = load_settings()
@@ -622,6 +826,32 @@ def api_firmware_status():
         'uf2_candidates': _find_recent_uf2_candidates(s),
         'flash_targets': _list_flash_targets(),
     })
+
+
+@app.route('/api/firmware/primary', methods=['GET', 'POST'])
+def api_firmware_primary():
+    s = load_settings()
+    firmware_folder = s.get('firmware_folder', '')
+    keyboard_name = s.get('keyboard_name', '')
+    try:
+        if request.method == 'GET':
+            info = read_primary_configuration(firmware_folder, keyboard_name)
+            return jsonify({
+                **info,
+                'instructions': _primary_switch_instructions(info['primary'], info['primary'], False),
+            })
+        payload = request.json or {}
+        info = switch_primary_configuration(firmware_folder, payload.get('primary'), keyboard_name)
+        return jsonify({
+            **info,
+            'instructions': _primary_switch_instructions(
+                info['previous_primary'], info['primary'], info['changed']
+            ),
+        })
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': f'primary 切替に失敗しました。設定は変更されていません: {e}'}), 500
 
 
 @app.route('/api/firmware/build', methods=['POST'])

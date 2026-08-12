@@ -36,3 +36,10 @@ def test_file_saved_state_is_separate_from_device_applied_state():
 def test_usb_connection_gets_visible_connected_state():
     assert "usbBtn.classList.toggle('usb-connected',usbConnected)" in HTML
     assert "usbBtn.textContent=usbConnected?'USB Connected':'Connect USB'" in HTML
+
+
+def test_primary_half_switch_ui_and_eight_step_log_are_present():
+    assert 'id="primary-side-select"' in HTML
+    assert 'onclick="applyPrimarySide()"' in HTML
+    assert "async function applyPrimarySide()" in HTML
+    assert "logPrimarySwitchInstructions(res.instructions||[])" in HTML
