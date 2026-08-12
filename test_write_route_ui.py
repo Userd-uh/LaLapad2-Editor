@@ -43,3 +43,4 @@ def test_primary_half_switch_ui_and_eight_step_log_are_present():
     assert 'onclick="applyPrimarySide()"' in HTML
     assert "async function applyPrimarySide()" in HTML
     assert "logPrimarySwitchInstructions(res.instructions||[])" in HTML
+    assert "左右trackpad overlayを同時に切り替えます" in HTML

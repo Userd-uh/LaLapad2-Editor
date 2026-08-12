@@ -530,10 +530,11 @@ _BUILD_ENTRY_RE = re.compile(
 )
 _BUILD_SHIELD_RE = re.compile(r'^\s*shield:\s*lalapadgen2_(left|right)(?:\s|$)', re.MULTILINE)
 _STUDIO_SNIPPET_RE = re.compile(r'^\s*snippet:\s*studio-rpc-usb-uart\s*\r?\n?', re.MULTILINE)
+_OVERLAY_NODE_RE = re.compile(r'(?ms)^\s*&(?P<name>trackpad_(?:listener|split)_[LR])\s*\{(?P<body>.*?)^\s*\};')
 
 
 def _primary_paths(firmware_folder, keyboard_name=''):
-    """Return the two firmware files that define the split central half."""
+    """Return all files which together define the split primary half."""
     firmware_folder = norm(firmware_folder)
     if not firmware_folder or not os.path.isdir(firmware_folder):
         raise ValueError('firmware folder が未設定、または見つかりません。')
@@ -548,6 +549,8 @@ def _primary_paths(firmware_folder, keyboard_name=''):
     paths = {
         'kconfig': os.path.join(shield_dir, 'Kconfig.defconfig'),
         'build': os.path.join(firmware_folder, 'build.yaml'),
+        'left_overlay': os.path.join(shield_dir, f'{keyboard_name}_left.overlay'),
+        'right_overlay': os.path.join(shield_dir, f'{keyboard_name}_right.overlay'),
     }
     missing = [path for path in paths.values() if not os.path.isfile(path)]
     if missing:
@@ -582,15 +585,109 @@ def _studio_side_from_build(content):
     raise ValueError('studio-rpc-usb-uart のビルド対象を特定できません。')
 
 
+def _overlay_nodes(content):
+    nodes = {}
+    for match in _OVERLAY_NODE_RE.finditer(content):
+        name = match.group('name')
+        if name in nodes:
+            raise ValueError(f'overlay 内の {name} 定義が一意ではありません。')
+        nodes[name] = match
+    return nodes
+
+
+def _node_has_exact_state(match, status, property_name=None):
+    body = match.group('body')
+    status_matches = re.findall(r'\bstatus\s*=\s*"([^"]+)"\s*;', body)
+    if status_matches != [status]:
+        return False
+    device_properties = re.findall(r'\b(device|input)\s*=\s*<\s*&iqs9151\s*>\s*;', body)
+    if property_name:
+        return device_properties == [property_name]
+    return not device_properties and not re.search(r'\b(device|input)\s*=', body)
+
+
+def _overlay_role_from_content(content, side):
+    """Validate one physical half as either its central or peripheral overlay form."""
+    side_letter = side[0].upper()
+    other_letter = 'R' if side_letter == 'L' else 'L'
+    nodes = _overlay_nodes(content)
+    listener_local = nodes.get(f'trackpad_listener_{side_letter}')
+    listener_remote = nodes.get(f'trackpad_listener_{other_letter}')
+    split_local = nodes.get(f'trackpad_split_{side_letter}')
+    split_remote = nodes.get(f'trackpad_split_{other_letter}')
+    if listener_local and listener_remote and not split_local and not split_remote:
+        if (_node_has_exact_state(listener_local, 'okay', 'device') and
+                _node_has_exact_state(listener_remote, 'okay')):
+            return 'central'
+    if split_local and split_remote and not listener_local and not listener_remote:
+        if (_node_has_exact_state(split_local, 'okay', 'device') and
+                _node_has_exact_state(split_remote, 'disabled')):
+            return 'peripheral'
+    raise ValueError(f'{side.lower()} overlay のprimary構成を厳格に判定できません。')
+
+
+def _overlay_primary_from_contents(left_content, right_content):
+    left_role = _overlay_role_from_content(left_content, 'left')
+    right_role = _overlay_role_from_content(right_content, 'right')
+    if left_role == 'central' and right_role == 'peripheral':
+        return 'left'
+    if left_role == 'peripheral' and right_role == 'central':
+        return 'right'
+    raise ValueError('left/right overlay のcentral/peripheral構成が一致していません。')
+
+
+def _primary_overlay_content(content, side, primary):
+    """Rewrite only validated trackpad nodes into the requested side's canonical form."""
+    current_role = _overlay_role_from_content(content, side)
+    expected_role = 'central' if side == primary else 'peripheral'
+    if current_role == expected_role:
+        return content
+    local = side[0].upper()
+    remote = 'R' if local == 'L' else 'L'
+    if expected_role == 'central':
+        replacements = {
+            f'trackpad_split_{local}': (
+                f'&trackpad_listener_{local} {{\n    status = "okay";\n    device = <&iqs9151>;\n}};'
+            ),
+            f'trackpad_split_{remote}': (
+                f'&trackpad_listener_{remote} {{\n    status = "okay";\n}};'
+            ),
+        }
+    else:
+        replacements = {
+            f'trackpad_listener_{local}': (
+                f'&trackpad_split_{local} {{\n    status = "okay";\n    device = <&iqs9151>;\n}};'
+            ),
+            f'trackpad_listener_{remote}': (
+                f'&trackpad_split_{remote} {{\n    status = "disabled";\n}};'
+            ),
+        }
+    nodes = _overlay_nodes(content)
+    result = content
+    for name, replacement in sorted(replacements.items(), key=lambda item: nodes[item[0]].start(), reverse=True):
+        match = nodes.get(name)
+        if not match:
+            raise ValueError(f'overlay 内の {name} が見つかりません。')
+        result = result[:match.start()] + replacement + result[match.end():]
+    if _overlay_role_from_content(result, side) != expected_role:
+        raise ValueError(f'{side} overlay の更新後検証に失敗しました。')
+    return result
+
+
 def read_primary_configuration(firmware_folder, keyboard_name=''):
-    """Inspect the compiled split role and the Studio build target without writing."""
+    """Inspect central role, Studio target, and both overlays without writing."""
     paths = _primary_paths(firmware_folder, keyboard_name)
     kconfig = _read_text_file(paths['kconfig'])
     build = _read_text_file(paths['build'])
+    left_overlay = _read_text_file(paths['left_overlay'])
+    right_overlay = _read_text_file(paths['right_overlay'])
     primary, _ = _primary_side_from_kconfig(kconfig)
     studio_side, _ = _studio_side_from_build(build)
     if studio_side != primary:
         raise ValueError('central 側と studio-rpc-usb-uart のビルド対象が一致していません。')
+    overlay_primary = _overlay_primary_from_contents(left_overlay, right_overlay)
+    if overlay_primary != primary:
+        raise ValueError('central 側と左右overlayの構成が一致していません。')
     return {'primary': primary, 'paths': paths}
 
 
@@ -679,7 +776,7 @@ def _atomic_replace_text_files(changes):
 
 
 def switch_primary_configuration(firmware_folder, target, keyboard_name=''):
-    """Move central role and Studio snippet together, or leave both source files untouched."""
+    """Move central role, Studio snippet, and both overlays as one rollback-capable group."""
     target = str(target or '').lower()
     if target not in PRIMARY_SIDES:
         raise ValueError('primary は left または right を指定してください。')
@@ -689,14 +786,22 @@ def switch_primary_configuration(firmware_folder, target, keyboard_name=''):
         return {**info, 'previous_primary': current, 'changed': False}
     kconfig = _read_text_file(info['paths']['kconfig'])
     build = _read_text_file(info['paths']['build'])
+    left_overlay = _read_text_file(info['paths']['left_overlay'])
+    right_overlay = _read_text_file(info['paths']['right_overlay'])
     updated_kconfig = _update_kconfig_primary(kconfig, target)
     updated_build = _update_build_primary(build, current, target)
-    # Re-parse both drafts before replacing either file.
-    if _primary_side_from_kconfig(updated_kconfig)[0] != target or _studio_side_from_build(updated_build)[0] != target:
+    updated_left_overlay = _primary_overlay_content(left_overlay, 'left', target)
+    updated_right_overlay = _primary_overlay_content(right_overlay, 'right', target)
+    # Re-parse every draft before replacing any of the four files.
+    if (_primary_side_from_kconfig(updated_kconfig)[0] != target or
+            _studio_side_from_build(updated_build)[0] != target or
+            _overlay_primary_from_contents(updated_left_overlay, updated_right_overlay) != target):
         raise ValueError('primary 切替後の設定検証に失敗しました。')
     _atomic_replace_text_files({
         info['paths']['kconfig']: updated_kconfig,
         info['paths']['build']: updated_build,
+        info['paths']['left_overlay']: updated_left_overlay,
+        info['paths']['right_overlay']: updated_right_overlay,
     })
     return {**info, 'primary': target, 'previous_primary': current, 'changed': True}
 
@@ -803,7 +908,7 @@ def _primary_switch_instructions(previous_primary, primary, changed):
         f'1/8 primary はすでに{primary_label}です。設定ファイルは変更していません。'
     )
     return [
-        change_line + ' GitHub Actionsまたはローカルビルドで settings_reset / right / left UF2を生成してください。',
+        change_line + ' Kconfig、build.yaml、left/right trackpad overlayを一括更新しました。GitHub Actionsまたはローカルビルドで settings_reset / right / left UF2を生成してください。',
         '2/8 settings_reset UF2 を物理的な右側へ書き込みます（RSTを2回でUF2ドライブを表示）。',
         '3/8 settings_reset UF2 を物理的な左側へ書き込みます。',
         '4/8 新しい right UF2 を物理的な右側へ書き込みます。',
