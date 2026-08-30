@@ -22,6 +22,8 @@ vm.runInContext(part('const TP_CLUSTER=', 'const TP_GESTURES=') +
   }
   assert.equal(getGestureMode({CONFIG_INPUT_IQS9151_SCROLL_Y_ENABLE:'n'},keys[1]),'0');
   assert.throws(()=>setGestureMode(left,keys[0],'invalid'));
+  setGestureMode(left,keys[0],2);
+  assert.equal(left.CONFIG_INPUT_IQS9151_2F_HORIZONTAL_NAV,'y');
   const positions=[];
   for(const side of ['left','right'])for(const fingers of [2,3])for(const direction of ['right','left','up','down']){
     positions.push(gestureActionPosition(side,fingers,direction));
@@ -38,3 +40,18 @@ vm.runInContext(part('const TP_CLUSTER=', 'const TP_GESTURES=') +
   assert.equal(bindings[73].raw,'&trans');
   `, context);
 console.log('Gesture modes, payloads and 16 independent action positions OK');
+
+// Exercise the production RPC preflight: no mutations may reach an old MCU.
+vm.runInContext(part('async function applyKeymapToDevice(', 'async function saveFirmwareSettings('), context);
+context.state={device:{conn:{}},layers:[{bindings:Array(76).fill({raw:'&trans'})}]};
+const requests=[];
+context.callDeviceRpc=async request=>{
+  requests.push(request);
+  return {keymap:{getKeymap:{layers:[{bindings:Array(68).fill({})}]}}};
+};
+vm.runInContext('applyKeymapToDevice()',context).then(result=>{
+  assert.match(result.error,/76-position firmware/);
+  assert.equal(requests.length,1);
+  assert.equal(requests[0].keymap.getKeymap,true);
+  console.log('Old-firmware RPC preflight rejects before any writes OK');
+}).catch(error=>{console.error(error);process.exitCode=1;});

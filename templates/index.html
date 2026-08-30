@@ -3315,6 +3315,7 @@ function getGestureMode(cfg,key){
   return key.startsWith('CONFIG_INPUT_IQS9151_3F_') ? '2' : '1';
 }
 function setGestureMode(cfg,key,mode){
+  mode=String(mode);
   if(!['0','1','2'].includes(String(mode))) throw new Error('Invalid gesture mode');
   cfg[key]=String(mode);
   if(key==='CONFIG_INPUT_IQS9151_2F_HORIZONTAL_MODE'){
