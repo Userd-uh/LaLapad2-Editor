@@ -1555,9 +1555,10 @@ const TP_SCHEMA=[
     {key:'CONFIG_INPUT_IQS9151_2F_TAP_MAX_MS',label:'Tap Max (ms)',type:'num',desc:'2本指タップと認識される最大接触時間（ms）。これより長いと別の動作として処理されます。'},
     {key:'CONFIG_INPUT_IQS9151_2F_TAP_MOVE',label:'Tap Move Limit',type:'num',desc:'2本指タップ中に許容される最大移動量。これを超えるとスクロール開始と判定されます。'},
     {key:'CONFIG_INPUT_IQS9151_2F_PRESSHOLD_ENABLE',label:'Press Hold Enable',type:'bool',desc:'2本指長押しを認識する機能の有効/無効。'},
-    {key:'CONFIG_INPUT_IQS9151_SCROLL_Y_ENABLE',label:'Vertical Scroll',type:'bool',desc:'2本指の上下スワイプで縦スクロールを行う機能の有効/無効。'},
-    {key:'_2F_HORIZONTAL_ACTION',label:'Horizontal Swipe',type:'swipeMode',desc:'2本指の左右スワイプを横スクロールとして送るか、方向別のキーバインドとして送るかを選びます。'},
-    {label:'Navigation Bindings',ja:'方向別キー割り当て',type:'navBindings',desc:'2本指ナビで発動する右/左スワイプのキーバインドです。3本指の横スワイプと同じスロットを共有します。'},
+    {key:'CONFIG_INPUT_IQS9151_2F_HORIZONTAL_MODE',label:'Horizontal',type:'gestureMode',axis:'horizontal',desc:'横方向を連続スクロール、方向別キー割り当て、または無効にします。'},
+    {key:'CONFIG_INPUT_IQS9151_2F_VERTICAL_MODE',label:'Vertical',type:'gestureMode',axis:'vertical',desc:'縦方向を連続スクロール、方向別キー割り当て、または無効にします。'},
+    {label:'Horizontal Action Bindings',ja:'横方向キー割り当て',type:'navBindings',axis:'horizontal',modeKeys:['CONFIG_INPUT_IQS9151_2F_HORIZONTAL_MODE','CONFIG_INPUT_IQS9151_3F_HORIZONTAL_MODE'],desc:'Key bindings 選択時に発動する方向別割り当てです。'},
+    {label:'Vertical Action Bindings',ja:'縦方向キー割り当て',type:'navBindings',axis:'vertical',modeKeys:['CONFIG_INPUT_IQS9151_2F_VERTICAL_MODE','CONFIG_INPUT_IQS9151_3F_VERTICAL_MODE'],desc:'Key bindings 選択時に発動する方向別割り当てです。'},
     {key:'CONFIG_INPUT_IQS9151_2F_SCROLL_START_MOVE',label:'Scroll Start Move',type:'num',desc:'スクロールと認識される最小移動量。小さいほど少し動かすだけでスクロールが始まります。大きくすると誤スクロールを防げます。'},
     {key:'CONFIG_INPUT_IQS9151_2F_NAV_SWIPE_THRESHOLD',label:'Navigation Threshold',type:'num',min:1,max:2000,desc:'方向別キーバインドを発動する左右スワイプ量のしきい値。Horizontal Swipe が Key bindings のときに使われます。'},
   ]},
@@ -1575,6 +1576,8 @@ const TP_SCHEMA=[
     {key:'CONFIG_INPUT_IQS9151_2F_PINCH_WHEEL_GAIN_X10',label:'Wheel Gain x10',type:'num',desc:'ピンチをホイール入力に変換する際のゲイン（実際の値の10倍で指定）。値が大きいほどわずかなピンチで大きくスクロール/ズームします。'},
   ]},
   {title:'3 Finger Gesture',rows:[
+    {key:'CONFIG_INPUT_IQS9151_3F_HORIZONTAL_MODE',label:'Horizontal',type:'gestureMode',axis:'horizontal',desc:'3本指の横方向を連続スクロール、方向別キー割り当て、または無効にします。'},
+    {key:'CONFIG_INPUT_IQS9151_3F_VERTICAL_MODE',label:'Vertical',type:'gestureMode',axis:'vertical',desc:'3本指の縦方向を連続スクロール、方向別キー割り当て、または無効にします。'},
     {key:'CONFIG_INPUT_IQS9151_3F_TAP_ENABLE',label:'Tap Enable',type:'bool',desc:'3本指タップを認識する機能の有効/無効。'},
     {key:'CONFIG_INPUT_IQS9151_3F_TAP_MAX_MS',label:'Tap Max (ms)',type:'num',desc:'3本指タップと認識される最大接触時間（ms）。'},
     {key:'CONFIG_INPUT_IQS9151_3F_TAP_MOVE',label:'Tap Move Limit',type:'num',desc:'3本指タップ中に許容される最大移動量。この値を超えるとスワイプとして処理されます。'},
@@ -1829,7 +1832,7 @@ function isConfigKeyChanged(side, key){
 }
 function configKeysForRow(row){
   if(row.type==='rotate') return ['CONFIG_INPUT_IQS9151_ROTATE_0','CONFIG_INPUT_IQS9151_ROTATE_90','CONFIG_INPUT_IQS9151_ROTATE_180','CONFIG_INPUT_IQS9151_ROTATE_270'];
-  if(row.type==='swipeMode') return ['CONFIG_INPUT_IQS9151_2F_HORIZONTAL_NAV','CONFIG_INPUT_IQS9151_SCROLL_X_ENABLE'];
+  if(row.type==='gestureMode') return [row.key];
   return row.key ? [row.key] : [];
 }
 function rowWriteKind(row, cid){
@@ -3295,17 +3298,19 @@ function copyTpGestureBindings(fromSide,toSide){
 }
 function getRotation(cfg){ if(cfg['CONFIG_INPUT_IQS9151_ROTATE_90']==='y') return 90; if(cfg['CONFIG_INPUT_IQS9151_ROTATE_180']==='y') return 180; if(cfg['CONFIG_INPUT_IQS9151_ROTATE_270']==='y') return 270; return 0; }
 function setRotation(cfg,deg,schema,cid){ ['0','90','180','270'].forEach(d=>cfg[`CONFIG_INPUT_IQS9151_ROTATE_${d}`]=(+d===deg?'y':'n')); markUnsaved(); renderSettingsGrid(schema,cfg,cid); }
-function getTwoFingerHorizontalAction(cfg){
-  return cfg['CONFIG_INPUT_IQS9151_2F_HORIZONTAL_NAV']==='y' ? 'nav' : 'scroll';
+function getGestureMode(cfg,key){
+  const value=String(cfg[key]??'');
+  if(value==='0'||value==='1'||value==='2') return value;
+  if(key==='CONFIG_INPUT_IQS9151_2F_HORIZONTAL_MODE') return cfg['CONFIG_INPUT_IQS9151_2F_HORIZONTAL_NAV']==='y' ? '2' : '1';
+  return key.startsWith('CONFIG_INPUT_IQS9151_3F_') ? '2' : '1';
 }
-function setTwoFingerHorizontalAction(cfg,mode){
-  if(mode==='nav'){
-    cfg['CONFIG_INPUT_IQS9151_2F_HORIZONTAL_NAV']='y';
-    cfg['CONFIG_INPUT_IQS9151_SCROLL_X_ENABLE']='n';
-  }else{
-    cfg['CONFIG_INPUT_IQS9151_2F_HORIZONTAL_NAV']='n';
-    cfg['CONFIG_INPUT_IQS9151_SCROLL_X_ENABLE']='y';
+function setGestureMode(cfg,key,mode){
+  cfg[key]=mode;
+  if(key==='CONFIG_INPUT_IQS9151_2F_HORIZONTAL_MODE'){
+    cfg['CONFIG_INPUT_IQS9151_2F_HORIZONTAL_NAV']=mode==='2'?'y':'n';
+    cfg['CONFIG_INPUT_IQS9151_SCROLL_X_ENABLE']=mode==='1'?'y':'n';
   }
+  if(key==='CONFIG_INPUT_IQS9151_2F_VERTICAL_MODE') cfg['CONFIG_INPUT_IQS9151_SCROLL_Y_ENABLE']=mode==='1'?'y':'n';
   if(!cfg['CONFIG_INPUT_IQS9151_2F_NAV_SWIPE_THRESHOLD']){
     cfg['CONFIG_INPUT_IQS9151_2F_NAV_SWIPE_THRESHOLD']='200';
   }
@@ -3346,32 +3351,35 @@ function applyBrowserNavBindings(){
   setTpNavBinding('left','&kp LA(RIGHT)');
   setStatus(`Layer ${state.currentLayer} の2本指ナビを Alt+← / Alt+→ に設定しました。`,'s-ok');
 }
-function renderTpNavBindings(rowEl,cfgObj){
+function renderTpNavBindings(rowEl,cfgObj,row){
   const controls=document.createElement('div');
   controls.className='nav-binding-controls';
-  const enabled=getTwoFingerHorizontalAction(cfgObj)==='nav';
-  [['right','Swipe right'],['left','Swipe left']].forEach(([direction,label])=>{
+  const vertical=row.axis==='vertical';
+  const directions=vertical ? [['up','Swipe up'],['down','Swipe down']] : [['right','Swipe right'],['left','Swipe left']];
+  const offsets=vertical ? {up:5,down:6} : {right:3,left:4};
+  const enabled=(row.modeKeys||[]).some(key=>getGestureMode(cfgObj,key)==='2');
+  directions.forEach(([direction,label])=>{
     const pair=document.createElement('div'); pair.className='nav-binding-pair';
     const dir=document.createElement('span'); dir.className='nav-binding-dir'; dir.textContent=label;
-    const raw=getTpNavBinding(direction);
+    const keyIdx=TP_CLUSTER[state.tpSide][offsets[direction]];
+    const raw=state.layers[state.currentLayer]?.bindings?.[keyIdx]?.raw || '&trans';
     const btn=document.createElement('button'); btn.className=`nav-binding-btn ${bindingClass(raw)}`;
     btn.textContent=bindingLabel(raw); btn.title=raw; btn.disabled=!enabled;
-    const keyIdx=TP_CLUSTER[state.tpSide][direction==='right'?3:4];
     if(isLayerBindingChanged(state.currentLayer,keyIdx)) btn.classList.add('changed-outline','rpc');
-    btn.onclick=()=>editTpNavBinding(direction,btn);
+    btn.onclick=()=>openBindingPickerAt(btn,(binding)=>setBinding(keyIdx,binding),{title:`${label} binding`,initialCat:'app_media'});
     pair.appendChild(dir); pair.appendChild(btn); controls.appendChild(pair);
   });
   const preset=document.createElement('button');
   preset.className='btn sm';
   preset.textContent='Browser: Alt+← / Alt+→';
-  preset.disabled=!enabled;
+  preset.disabled=!enabled || vertical;
   preset.onclick=applyBrowserNavBindings;
-  controls.appendChild(preset);
+  if(!vertical) controls.appendChild(preset);
   const note=document.createElement('span');
   note.className='nav-binding-note';
   note.textContent=enabled
     ? '右スワイプ=戻る、左スワイプ=進む。3本指横スワイプと共通です。'
-    : 'Horizontal Swipe を Key bindings にすると編集できます。';
+    : '対応するジェスチャーを Key bindings にすると編集できます。';
   controls.appendChild(note);
   rowEl.appendChild(controls);
 }
@@ -3381,12 +3389,12 @@ function copyTpSection(sect){
   sect.rows.forEach(row=>{
     if(row.type==='rotate'){
       ['0','90','180','270'].forEach(d=>{ const k=`CONFIG_INPUT_IQS9151_ROTATE_${d}`; if(k in src) dst[k]=src[k]; });
-    }else if(row.type==='swipeMode'){
-      ['CONFIG_INPUT_IQS9151_2F_HORIZONTAL_NAV','CONFIG_INPUT_IQS9151_SCROLL_X_ENABLE'].forEach(k=>{ if(k in src) dst[k]=src[k]; });
+    }else if(row.type==='gestureMode'){
+      if(row.key in src) dst[row.key]=src[row.key];
     }else if(row.type==='navBindings'){
       const binds=state.layers[state.currentLayer]?.bindings;
       if(binds){
-        [3,4].forEach(offset=>{
+        (row.axis==='vertical'?[5,6]:[3,4]).forEach(offset=>{
           const fromIdx=TP_CLUSTER[state.tpSide][offset];
           const toIdx=TP_CLUSTER[other][offset];
           while(binds.length<=toIdx) binds.push({raw:'&trans'});
@@ -3453,8 +3461,8 @@ function renderSettingsGrid(schema,cfgObj,cid){
         r.appendChild(wrap);
       }
       else if(row.type==='rotate'){ const grp=document.createElement('div'); grp.className='rot-grp'; const cur=getRotation(cfgObj); [0,90,180,270].forEach(deg=>{ const b=document.createElement('button'); b.className='rot-btn'+(cur===deg?' active':''); b.textContent=deg+'°'; b.onclick=()=>setRotation(cfgObj,deg,schema,cid); grp.appendChild(b); }); r.appendChild(grp); }
-      else if(row.type==='swipeMode'){ const sel=document.createElement('select'); sel.className='sselect'; [{value:'scroll',label:'Horizontal Scroll'},{value:'nav',label:'Key bindings'}].forEach(opt=>{ const o=document.createElement('option'); o.value=opt.value; o.textContent=opt.label; sel.appendChild(o); }); sel.value=getTwoFingerHorizontalAction(cfgObj); sel.onchange=()=>{ setTwoFingerHorizontalAction(cfgObj,sel.value); renderSettingsGrid(schema,cfgObj,cid); }; r.appendChild(sel); }
-      else if(row.type==='navBindings') renderTpNavBindings(r,cfgObj);
+      else if(row.type==='gestureMode'){ const sel=document.createElement('select'); sel.className='sselect'; [{value:'1',label:row.axis==='vertical'?'Vertical Scroll':'Horizontal Scroll'},{value:'2',label:'Key bindings'},{value:'0',label:'Disabled'}].forEach(opt=>{ const o=document.createElement('option'); o.value=opt.value; o.textContent=opt.label; sel.appendChild(o); }); sel.value=getGestureMode(cfgObj,row.key); sel.onchange=()=>{ setGestureMode(cfgObj,row.key,sel.value); renderSettingsGrid(schema,cfgObj,cid); }; r.appendChild(sel); }
+      else if(row.type==='navBindings') renderTpNavBindings(r,cfgObj,row);
       div.appendChild(r);
     });
     container.appendChild(div);

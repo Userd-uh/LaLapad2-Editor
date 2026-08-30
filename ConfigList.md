@@ -68,6 +68,10 @@
 | `CONFIG_INPUT_IQS9151_3F_PRESSHOLD_ENABLE` | `y` | `y / n` | 3F TapDrag 有効/無効 |
 | `CONFIG_INPUT_IQS9151_3F_TAPDRAG_GAP_MAX_MS` | `200` | `1..1000` | 3F Tap後にBTN2を保持して2回目3Fタッチを待つ最大時間 |
 | `CONFIG_INPUT_IQS9151_3F_SWIPE_THRESHOLD` | `200` | `0..1000` | 3F Swipe しきい値 |
+| `CONFIG_INPUT_IQS9151_2F_HORIZONTAL_MODE` | `1` | `0 / 1 / 2` | 2F横: 無効 / 横スクロール / 仮想キーアクション |
+| `CONFIG_INPUT_IQS9151_2F_VERTICAL_MODE` | `1` | `0 / 1 / 2` | 2F縦: 無効 / 縦スクロール / 仮想キーアクション |
+| `CONFIG_INPUT_IQS9151_3F_HORIZONTAL_MODE` | `2` | `0 / 1 / 2` | 3F横: 無効 / 横スクロール / 仮想キーアクション |
+| `CONFIG_INPUT_IQS9151_3F_VERTICAL_MODE` | `2` | `0 / 1 / 2` | 3F縦: 無効 / 縦スクロール / 仮想キーアクション |
 
 ### 5. Inertia
 
