@@ -544,6 +544,7 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
     </div>
     <div class="gest-grid" id="tp-gesture-keys"></div>
   </div>
+  <div class="write-hint-items" style="padding:6px 14px">モード変更: Save All → 左右のfirmware rebuild/writeが必要です。Actionのキー割り当て: 対応ファームウェアへ更新後はStudio RPCで反映できます。</div>
   <div class="settings-grid" id="tp-settings"></div>
   <div class="tab-palette-slot" id="pal-slot-trackpad"></div>
 </div>
@@ -861,22 +862,28 @@ const KL=[
   // Row6: 繧ｸ繧ｧ繧ｹ繝√Ε繝ｼ (swipes + pinch mod) = index 58-67
   {x:0,y:600,w:100,h:100},{x:100,y:600,w:100,h:100},{x:200,y:600,w:100,h:100},{x:300,y:600,w:100,h:100},{x:400,y:600,w:100,h:100},
   {x:800,y:600,w:100,h:100},{x:900,y:600,w:100,h:100},{x:1000,y:600,w:100,h:100},{x:1100,y:600,w:100,h:100},{x:1200,y:600,w:100,h:100},
+  {x:0,y:700,w:100,h:100},{x:100,y:700,w:100,h:100},{x:200,y:700,w:100,h:100},{x:300,y:700,w:100,h:100},
+  {x:800,y:700,w:100,h:100},{x:900,y:700,w:100,h:100},{x:1000,y:700,w:100,h:100},{x:1100,y:700,w:100,h:100},
 ];
 
 // 繧ｸ繧ｧ繧ｹ繝√Ε繝ｼ繧ｭ繝ｼ: 蟾ｦ=[52,53,54,58,59,60,61,62] 蜿ｳ=[55,56,57,63,64,65,66,67]
 const TP_CLUSTER={
-  left: [52,53,54,58,59,60,61,62],
-  right:[55,56,57,63,64,65,66,67],
+  left: [52,53,54,58,59,60,61,62,68,69,70,71],
+  right:[55,56,57,63,64,65,66,67,72,73,74,75],
 };
 const TP_GESTURES=[
   {slot:'Tap1',label:'1本指タップ'},
   {slot:'Tap2',label:'2本指タップ'},
   {slot:'Tap3',label:'3本指タップ'},
-  {slot:'SwpR',label:'横スワイプ右（3本指 / 2本指ナビ）'},
-  {slot:'SwpL',label:'横スワイプ左（3本指 / 2本指ナビ）'},
-  {slot:'SwpU',label:'3本指スワイプ上'},
-  {slot:'SwpD',label:'3本指スワイプ下'},
+  {slot:'2F R',label:'2本指スワイプ右'},
+  {slot:'2F L',label:'2本指スワイプ左'},
+  {slot:'2F U',label:'2本指スワイプ上'},
+  {slot:'2F D',label:'2本指スワイプ下'},
   {slot:'Pinch',label:'2本指ピンチ修飾キー'},
+  {slot:'3F R',label:'3本指スワイプ右'},
+  {slot:'3F L',label:'3本指スワイプ左'},
+  {slot:'3F U',label:'3本指スワイプ上'},
+  {slot:'3F D',label:'3本指スワイプ下'},
 ];
 const TP_GESTURE_LABELS=TP_GESTURES.map(item=>`${item.slot}: ${item.label}`);
 
@@ -1557,10 +1564,10 @@ const TP_SCHEMA=[
     {key:'CONFIG_INPUT_IQS9151_2F_PRESSHOLD_ENABLE',label:'Press Hold Enable',type:'bool',desc:'2本指長押しを認識する機能の有効/無効。'},
     {key:'CONFIG_INPUT_IQS9151_2F_HORIZONTAL_MODE',label:'Horizontal',type:'gestureMode',axis:'horizontal',desc:'横方向を連続スクロール、方向別キー割り当て、または無効にします。'},
     {key:'CONFIG_INPUT_IQS9151_2F_VERTICAL_MODE',label:'Vertical',type:'gestureMode',axis:'vertical',desc:'縦方向を連続スクロール、方向別キー割り当て、または無効にします。'},
-    {label:'Horizontal Action Bindings',ja:'横方向キー割り当て',type:'navBindings',axis:'horizontal',modeKeys:['CONFIG_INPUT_IQS9151_2F_HORIZONTAL_MODE','CONFIG_INPUT_IQS9151_3F_HORIZONTAL_MODE'],desc:'Key bindings 選択時に発動する方向別割り当てです。'},
-    {label:'Vertical Action Bindings',ja:'縦方向キー割り当て',type:'navBindings',axis:'vertical',modeKeys:['CONFIG_INPUT_IQS9151_2F_VERTICAL_MODE','CONFIG_INPUT_IQS9151_3F_VERTICAL_MODE'],desc:'Key bindings 選択時に発動する方向別割り当てです。'},
+    {label:'2F Horizontal Action',type:'navBindings',fingers:2,axis:'horizontal',modeKey:'CONFIG_INPUT_IQS9151_2F_HORIZONTAL_MODE'},
+    {label:'2F Vertical Action',type:'navBindings',fingers:2,axis:'vertical',modeKey:'CONFIG_INPUT_IQS9151_2F_VERTICAL_MODE'},
     {key:'CONFIG_INPUT_IQS9151_2F_SCROLL_START_MOVE',label:'Scroll Start Move',type:'num',desc:'スクロールと認識される最小移動量。小さいほど少し動かすだけでスクロールが始まります。大きくすると誤スクロールを防げます。'},
-    {key:'CONFIG_INPUT_IQS9151_2F_NAV_SWIPE_THRESHOLD',label:'Navigation Threshold',type:'num',min:1,max:2000,desc:'方向別キーバインドを発動する左右スワイプ量のしきい値。Horizontal Swipe が Key bindings のときに使われます。'},
+    {key:'CONFIG_INPUT_IQS9151_2F_NAV_SWIPE_THRESHOLD',label:'Navigation Threshold',type:'num',min:1,max:2000,desc:'2本指の方向別キーバインドを発動する移動量のしきい値。横・縦のうち Key bindings に設定した軸に適用されます。'},
   ]},
   {title:'Scroll Inertia',rows:[
     {key:'CONFIG_INPUT_IQS9151_SCROLL_INERTIA_ENABLE',label:'Enable',type:'bool',desc:'スクロール慣性機能の有効/無効。有効にすると指を離した後もスクロールが滑らかに減速しながら続きます。'},
@@ -1576,6 +1583,8 @@ const TP_SCHEMA=[
     {key:'CONFIG_INPUT_IQS9151_2F_PINCH_WHEEL_GAIN_X10',label:'Wheel Gain x10',type:'num',desc:'ピンチをホイール入力に変換する際のゲイン（実際の値の10倍で指定）。値が大きいほどわずかなピンチで大きくスクロール/ズームします。'},
   ]},
   {title:'3 Finger Gesture',rows:[
+    {label:'3F Horizontal Action',type:'navBindings',fingers:3,axis:'horizontal',modeKey:'CONFIG_INPUT_IQS9151_3F_HORIZONTAL_MODE'},
+    {label:'3F Vertical Action',type:'navBindings',fingers:3,axis:'vertical',modeKey:'CONFIG_INPUT_IQS9151_3F_VERTICAL_MODE'},
     {key:'CONFIG_INPUT_IQS9151_3F_HORIZONTAL_MODE',label:'Horizontal',type:'gestureMode',axis:'horizontal',desc:'3本指の横方向を連続スクロール、方向別キー割り当て、または無効にします。'},
     {key:'CONFIG_INPUT_IQS9151_3F_VERTICAL_MODE',label:'Vertical',type:'gestureMode',axis:'vertical',desc:'3本指の縦方向を連続スクロール、方向別キー割り当て、または無効にします。'},
     {key:'CONFIG_INPUT_IQS9151_3F_TAP_ENABLE',label:'Tap Enable',type:'bool',desc:'3本指タップを認識する機能の有効/無効。'},
@@ -3301,11 +3310,13 @@ function setRotation(cfg,deg,schema,cid){ ['0','90','180','270'].forEach(d=>cfg[
 function getGestureMode(cfg,key){
   const value=String(cfg[key]??'');
   if(value==='0'||value==='1'||value==='2') return value;
-  if(key==='CONFIG_INPUT_IQS9151_2F_HORIZONTAL_MODE') return cfg['CONFIG_INPUT_IQS9151_2F_HORIZONTAL_NAV']==='y' ? '2' : '1';
+  if(key==='CONFIG_INPUT_IQS9151_2F_HORIZONTAL_MODE') return cfg['CONFIG_INPUT_IQS9151_2F_HORIZONTAL_NAV']==='y' ? '2' : (cfg['CONFIG_INPUT_IQS9151_SCROLL_X_ENABLE']==='n'?'0':'1');
+  if(key==='CONFIG_INPUT_IQS9151_2F_VERTICAL_MODE') return cfg['CONFIG_INPUT_IQS9151_SCROLL_Y_ENABLE']==='n'?'0':'1';
   return key.startsWith('CONFIG_INPUT_IQS9151_3F_') ? '2' : '1';
 }
 function setGestureMode(cfg,key,mode){
-  cfg[key]=mode;
+  if(!['0','1','2'].includes(String(mode))) throw new Error('Invalid gesture mode');
+  cfg[key]=String(mode);
   if(key==='CONFIG_INPUT_IQS9151_2F_HORIZONTAL_MODE'){
     cfg['CONFIG_INPUT_IQS9151_2F_HORIZONTAL_NAV']=mode==='2'?'y':'n';
     cfg['CONFIG_INPUT_IQS9151_SCROLL_X_ENABLE']=mode==='1'?'y':'n';
@@ -3351,34 +3362,52 @@ function applyBrowserNavBindings(){
   setTpNavBinding('left','&kp LA(RIGHT)');
   setStatus(`Layer ${state.currentLayer} の2本指ナビを Alt+← / Alt+→ に設定しました。`,'s-ok');
 }
+function gestureActionOffsets(row){
+  return row.fingers===3 ? (row.axis==='vertical'?[10,11]:[8,9]) : (row.axis==='vertical'?[5,6]:[3,4]);
+}
+function gestureActionPosition(side,fingers,direction){
+  const offsets=fingers===3?{right:8,left:9,up:10,down:11}:{right:3,left:4,up:5,down:6};
+  return TP_CLUSTER[side][offsets[direction]];
+}
+function editGestureAction(keyIdx,label,anchorEl){
+  const apply=raw=>{ setBinding(keyIdx,raw); renderTpSettings(); };
+  openBindingPickerAt(anchorEl,raw=>{
+    if(needsFollowUpPicker(raw)){
+      openTemplateFollowUpPicker({tab:'trackpad',title:label,target:{type:'gesture',idx:keyIdx},template:raw,onComplete:apply});
+    }else apply(raw);
+  },{title:label,initialCat:'app_media'});
+}
 function renderTpNavBindings(rowEl,cfgObj,row){
   const controls=document.createElement('div');
   controls.className='nav-binding-controls';
   const vertical=row.axis==='vertical';
   const directions=vertical ? [['up','Swipe up'],['down','Swipe down']] : [['right','Swipe right'],['left','Swipe left']];
-  const offsets=vertical ? {up:5,down:6} : {right:3,left:4};
-  const enabled=(row.modeKeys||[]).some(key=>getGestureMode(cfgObj,key)==='2');
+  const enabled=getGestureMode(cfgObj,row.modeKey)==='2';
   directions.forEach(([direction,label])=>{
     const pair=document.createElement('div'); pair.className='nav-binding-pair';
     const dir=document.createElement('span'); dir.className='nav-binding-dir'; dir.textContent=label;
-    const keyIdx=TP_CLUSTER[state.tpSide][offsets[direction]];
+    const keyIdx=gestureActionPosition(state.tpSide,row.fingers,direction);
     const raw=state.layers[state.currentLayer]?.bindings?.[keyIdx]?.raw || '&trans';
     const btn=document.createElement('button'); btn.className=`nav-binding-btn ${bindingClass(raw)}`;
     btn.textContent=bindingLabel(raw); btn.title=raw; btn.disabled=!enabled;
     if(isLayerBindingChanged(state.currentLayer,keyIdx)) btn.classList.add('changed-outline','rpc');
-    btn.onclick=()=>openBindingPickerAt(btn,(binding)=>setBinding(keyIdx,binding),{title:`${label} binding`,initialCat:'app_media'});
+    btn.onclick=()=>editGestureAction(keyIdx,`${row.fingers}F ${label}`,btn);
     pair.appendChild(dir); pair.appendChild(btn); controls.appendChild(pair);
   });
   const preset=document.createElement('button');
   preset.className='btn sm';
   preset.textContent='Browser: Alt+← / Alt+→';
   preset.disabled=!enabled || vertical;
-  preset.onclick=applyBrowserNavBindings;
+  preset.onclick=()=>{
+    setBinding(gestureActionPosition(state.tpSide,row.fingers,'right'),'&kp LA(LEFT)');
+    setBinding(gestureActionPosition(state.tpSide,row.fingers,'left'),'&kp LA(RIGHT)');
+    renderTpSettings();
+  };
   if(!vertical) controls.appendChild(preset);
   const note=document.createElement('span');
   note.className='nav-binding-note';
   note.textContent=enabled
-    ? '右スワイプ=戻る、左スワイプ=進む。3本指横スワイプと共通です。'
+    ? `${row.fingers}F専用の割り当てです（Studio RPCで反映）。`
     : '対応するジェスチャーを Key bindings にすると編集できます。';
   controls.appendChild(note);
   rowEl.appendChild(controls);
@@ -3390,11 +3419,11 @@ function copyTpSection(sect){
     if(row.type==='rotate'){
       ['0','90','180','270'].forEach(d=>{ const k=`CONFIG_INPUT_IQS9151_ROTATE_${d}`; if(k in src) dst[k]=src[k]; });
     }else if(row.type==='gestureMode'){
-      if(row.key in src) dst[row.key]=src[row.key];
+      setGestureMode(dst,row.key,getGestureMode(src,row.key));
     }else if(row.type==='navBindings'){
       const binds=state.layers[state.currentLayer]?.bindings;
       if(binds){
-        (row.axis==='vertical'?[5,6]:[3,4]).forEach(offset=>{
+        gestureActionOffsets(row).forEach(offset=>{
           const fromIdx=TP_CLUSTER[state.tpSide][offset];
           const toIdx=TP_CLUSTER[other][offset];
           while(binds.length<=toIdx) binds.push({raw:'&trans'});
@@ -5181,6 +5210,9 @@ async function applyKeymapToDevice({quiet=false}={}){
     const latest=await callDeviceRpc({keymap:{getKeymap:true}},8000);
     const remoteKeymap=latest.keymap?.getKeymap;
     if(!remoteKeymap?.layers?.length) return {error:'Device keymap could not be read.'};
+    if(state.layers.some((layer,i)=>(layer.bindings?.length||0)>(remoteKeymap.layers[i]?.bindings?.length||0))){
+      return {error:'Device layout is older or has fewer keys. Back up the keymap and rebuild/write both halves with the 76-position firmware before RPC write.'};
+    }
     await loadDeviceBehaviors();
     state.device.keymap=remoteKeymap;
     await loadDevicePhysicalLayouts();
