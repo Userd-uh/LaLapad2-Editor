@@ -212,6 +212,18 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
   background:var(--kbg);color:var(--text);cursor:pointer;font-size:10px;white-space:pre-line;line-height:1.15;}
 .nav-binding-btn:hover{background:var(--khov);border-color:var(--a2);}
 .nav-binding-note{font-size:9px;color:var(--muted);max-width:260px;text-align:right;line-height:1.35;}
+.gesture-raw{padding:8px 14px;flex-shrink:0;border-bottom:1px solid var(--bdr);}
+.gesture-raw summary{cursor:pointer;color:var(--dim);font-size:11px;}
+.gesture-raw[open] summary{margin-bottom:8px;}
+.gesture-mode-row{flex-wrap:wrap;margin-top:10px;}
+.gesture-mode-controls{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.gesture-mode-source{flex-basis:100%;font-size:10px;color:var(--dim);line-height:1.5;}
+.gesture-apply{font-size:9px;border:1px solid currentColor;border-radius:3px;padding:2px 4px;white-space:nowrap;}
+.gesture-apply.firmware{color:#e8b85e;}
+.gesture-apply.rpc{color:#70b7ff;}
+.gesture-action-row>.slabel{display:none;}
+.gesture-action-row .nav-binding-controls{width:100%;min-width:0;}
+.gesture-action-row .nav-binding-dir{width:auto;}
 
 /* Gesture section in trackpad tab */
 .gest-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:5px;}
@@ -533,7 +545,8 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
   <div class="layer-bar" id="tp-layer-bar">
     <span style="color:var(--dim);font-size:11px">Layer:</span>
   </div>
-  <div style="padding:8px 14px;flex-shrink:0;border-bottom:1px solid var(--bdr);">
+  <details class="gesture-raw">
+    <summary>Advanced / Raw gesture bindings（Tap・Pinchなど）</summary>
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
       <div style="font-size:10px;color:var(--a2);text-transform:uppercase;letter-spacing:.05em;">
         Gesture bindings
@@ -543,7 +556,7 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
       </div>
     </div>
     <div class="gest-grid" id="tp-gesture-keys"></div>
-  </div>
+  </details>
   <div class="write-hint-items" style="padding:6px 14px">モード変更: Save All → 左右のfirmware rebuild/writeが必要です。Actionのキー割り当て: 対応ファームウェアへ更新後はStudio RPCで反映できます。</div>
   <div class="settings-grid" id="tp-settings"></div>
   <div class="tab-palette-slot" id="pal-slot-trackpad"></div>
@@ -3382,7 +3395,7 @@ function renderTpNavBindings(rowEl,cfgObj,row){
   const controls=document.createElement('div');
   controls.className='nav-binding-controls';
   const vertical=row.axis==='vertical';
-  const directions=vertical ? [['up','Swipe up'],['down','Swipe down']] : [['right','Swipe right'],['left','Swipe left']];
+  const directions=vertical ? [['up','Swipe ↑'],['down','Swipe ↓']] : [['left','Swipe ←'],['right','Swipe →']];
   const enabled=getGestureMode(cfgObj,row.modeKey)==='2';
   directions.forEach(([direction,label])=>{
     const pair=document.createElement('div'); pair.className='nav-binding-pair';
@@ -3390,10 +3403,11 @@ function renderTpNavBindings(rowEl,cfgObj,row){
     const keyIdx=gestureActionPosition(state.tpSide,row.fingers,direction);
     const raw=state.layers[state.currentLayer]?.bindings?.[keyIdx]?.raw || '&trans';
     const btn=document.createElement('button'); btn.className=`nav-binding-btn ${bindingClass(raw)}`;
-    btn.textContent=bindingLabel(raw); btn.title=raw; btn.disabled=!enabled;
+    btn.textContent=raw==='&kp LA(LEFT)'?'Browser Back（戻る）':raw==='&kp LA(RIGHT)'?'Browser Forward（進む）':bindingLabel(raw); btn.title=raw; btn.disabled=!enabled;
     if(isLayerBindingChanged(state.currentLayer,keyIdx)) btn.classList.add('changed-outline','rpc');
     btn.onclick=()=>editGestureAction(keyIdx,`${row.fingers}F ${label}`,btn);
-    pair.appendChild(dir); pair.appendChild(btn); controls.appendChild(pair);
+    const badge=document.createElement('span'); badge.className='gesture-apply rpc'; badge.textContent='RPC';
+    pair.appendChild(dir); pair.appendChild(btn); pair.appendChild(badge); controls.appendChild(pair);
   });
   const preset=document.createElement('button');
   preset.className='btn sm';
@@ -3436,6 +3450,12 @@ function copyTpSection(sect){
   markUnsaved();
   setStatus(`Copied "${sect.title}" to ${other}`,'s-ok');
 }
+function gestureDisplayRows(rows,cfg){
+  const modes=rows.filter(row=>row.type==='gestureMode');
+  if(!modes.length) return rows;
+  return modes.flatMap(mode=>[mode,...rows.filter(row=>row.type==='navBindings' && row.modeKey===mode.key && getGestureMode(cfg,mode.key)==='2')])
+    .concat(rows.filter(row=>row.type!=='gestureMode' && row.type!=='navBindings'));
+}
 function renderSettingsGrid(schema,cfgObj,cid){
   const container=document.getElementById(cid); container.innerHTML='';
   const isTP=cid==='tp-settings';
@@ -3448,8 +3468,9 @@ function renderSettingsGrid(schema,cfgObj,cid){
     hdr.appendChild(h3);
     if(isTP){ const other=state.tpSide==='left'?'right':'left'; const cb=document.createElement('button'); cb.className='btn sm'; cb.textContent=`Copy to ${other}`; cb.onclick=()=>copyTpSection(sect); hdr.appendChild(cb); }
     div.appendChild(hdr);
-    sect.rows.forEach(row=>{
+    gestureDisplayRows(sect.rows,cfgObj).forEach(row=>{
       const r=document.createElement('div'); r.className='srow';
+      if(row.type==='navBindings') r.classList.add('gesture-action-row');
       const lbl=document.createElement('span');
       lbl.className='slabel';
       const en=document.createElement('span');
@@ -3491,7 +3512,20 @@ function renderSettingsGrid(schema,cfgObj,cid){
         r.appendChild(wrap);
       }
       else if(row.type==='rotate'){ const grp=document.createElement('div'); grp.className='rot-grp'; const cur=getRotation(cfgObj); [0,90,180,270].forEach(deg=>{ const b=document.createElement('button'); b.className='rot-btn'+(cur===deg?' active':''); b.textContent=deg+'°'; b.onclick=()=>setRotation(cfgObj,deg,schema,cid); grp.appendChild(b); }); r.appendChild(grp); }
-      else if(row.type==='gestureMode'){ const sel=document.createElement('select'); sel.className='sselect'; [{value:'1',label:row.axis==='vertical'?'Vertical Scroll':'Horizontal Scroll'},{value:'2',label:'Key bindings'},{value:'0',label:'Disabled'}].forEach(opt=>{ const o=document.createElement('option'); o.value=opt.value; o.textContent=opt.label; sel.appendChild(o); }); sel.value=getGestureMode(cfgObj,row.key); sel.onchange=()=>{ setGestureMode(cfgObj,row.key,sel.value); renderSettingsGrid(schema,cfgObj,cid); }; r.appendChild(sel); }
+      else if(row.type==='gestureMode'){
+        r.classList.add('gesture-mode-row');
+        const controls=document.createElement('div'); controls.className='gesture-mode-controls';
+        const sel=document.createElement('select'); sel.className='sselect';
+        sel.setAttribute('aria-label',`${sect.title} ${row.label} mode`);
+        [{value:'1',label:row.axis==='vertical'?'Vertical Scroll':'Horizontal Scroll'},{value:'2',label:'Key bindings'},{value:'0',label:'Disabled'}].forEach(opt=>{ const o=document.createElement('option'); o.value=opt.value; o.textContent=opt.label; sel.appendChild(o); });
+        sel.value=getGestureMode(cfgObj,row.key);
+        sel.onchange=()=>{ setGestureMode(cfgObj,row.key,sel.value); renderSettingsGrid(schema,cfgObj,cid); };
+        const badge=document.createElement('span'); badge.className='gesture-apply firmware'; badge.textContent='Firmware'; badge.title='Save All → firmware rebuild / write required';
+        controls.appendChild(sel); controls.appendChild(badge); r.appendChild(controls);
+        const source=document.createElement('div'); source.className='gesture-mode-source';
+        source.textContent='Mode source: local .conf / Not read from MCU — 実機と異なる場合があります。反映には再ビルド・書き込みが必要です。';
+        r.appendChild(source);
+      }
       else if(row.type==='navBindings') renderTpNavBindings(r,cfgObj,row);
       div.appendChild(r);
     });

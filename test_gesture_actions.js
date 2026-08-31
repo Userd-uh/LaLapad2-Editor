@@ -39,6 +39,25 @@ vm.runInContext(part('const TP_CLUSTER=', 'const TP_GESTURES=') +
   assert.equal(bindings[69].raw,'&kp LC(TAB)');
   assert.equal(bindings[73].raw,'&trans');
   `, context);
+vm.runInContext(part('function gestureDisplayRows(', 'function renderSettingsGrid(') + `
+  const hm={type:'gestureMode',key:'h'}, vm={type:'gestureMode',key:'v'};
+  const ha={type:'navBindings',modeKey:'h'}, va={type:'navBindings',modeKey:'v'};
+  const tap={type:'bool',key:'tap'};
+  const rows=[va,tap,hm,vm,ha];
+  const before=JSON.stringify(rows);
+  for(const h of ['0','1','2'])for(const v of ['0','1','2']){
+    const cfg={h,v};
+    const display=gestureDisplayRows(rows,cfg);
+    assert.equal(display.includes(ha),h==='2');
+    assert.equal(display.includes(va),v==='2');
+    if(h==='2') assert.equal(display.indexOf(ha),display.indexOf(hm)+1);
+    if(v==='2') assert.equal(display.indexOf(va),display.indexOf(vm)+1);
+    assert.ok(display.includes(tap));
+    assert.equal(JSON.stringify(cfg),JSON.stringify({h,v}));
+  }
+  assert.equal(JSON.stringify(rows),before);
+  assert.equal(gestureDisplayRows([tap],{} )[0],tap);
+`, context);
 console.log('Gesture modes, payloads and 16 independent action positions OK');
 
 // Exercise the production RPC preflight: no mutations may reach an old MCU.
