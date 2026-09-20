@@ -538,27 +538,31 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
 </div>
 
 <div id="tab-trackpad" class="tab-pane">
-  <div class="sub-bar">
-    <button class="tp-btn active" onclick="switchTpSide('left')">Left Trackpad</button>
-    <button class="tp-btn" onclick="switchTpSide('right')">Right Trackpad</button>
+  <div class="tp-header">
+    <div><h2 id="tp-heading">左トラックパッドを編集中</h2><p>指の操作と、その動作を設定します。</p></div>
+    <div class="tp-side-controls" role="group" aria-label="編集するトラックパッド">
+      <button class="tp-btn active" data-side="left" aria-pressed="true" onclick="switchTpSide('left')">左</button>
+      <button class="tp-btn" data-side="right" aria-pressed="false" onclick="switchTpSide('right')">右</button>
+      <div class="tp-hardware-context"><img src="/static/keyboard-hardware.png" alt="左右の内側にトラックパッドがあるLaLapad2"><span id="tp-side-caption">左側を選択中</span></div>
+    </div>
   </div>
-  <div class="layer-bar" id="tp-layer-bar">
-    <span style="color:var(--dim);font-size:11px">Layer:</span>
+  <div class="tp-purpose" role="group" aria-label="トラックパッド設定の分類">
+    <button data-tp-view="actions" aria-pressed="true" onclick="switchTpView('actions')">操作の割り当て</button>
+    <button data-tp-view="feel" aria-pressed="false" onclick="switchTpView('feel')">動き・感度</button>
+    <button data-tp-view="advanced" aria-pressed="false" onclick="switchTpView('advanced')">詳細設定</button>
   </div>
-  <details class="gesture-raw">
-    <summary>Advanced / Raw gesture bindings（Tap・Pinchなど）</summary>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
-      <div style="font-size:10px;color:var(--a2);text-transform:uppercase;letter-spacing:.05em;">
-        Gesture bindings
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-        <button class="btn sm" id="tp-gesture-copy-btn" onclick="copyCurrentTpGestureBindings()">Copy to opposite side</button>
+  <div class="tp-scroll">
+    <div id="tp-actions">
+      <div class="tp-action-toolbar"><div class="layer-bar" id="tp-layer-bar"></div><button class="btn sm" id="tp-gesture-copy-btn" onclick="copyCurrentTpGestureBindings()">このレイヤーの割り当てを右へコピー</button></div>
+      <div class="tp-actions-layout">
+        <div id="tp-gesture-keys" class="tp-action-list" aria-label="操作と割り当て"></div>
+        <aside id="tp-action-editor" class="tp-action-editor" aria-label="選択した操作の編集"></aside>
       </div>
     </div>
-    <div class="gest-grid" id="tp-gesture-keys"></div>
-  </details>
-  <div class="write-hint-items" style="padding:6px 14px">モード変更: Save All → 左右のfirmware rebuild/writeが必要です。Actionのキー割り当て: 対応ファームウェアへ更新後はStudio RPCで反映できます。</div>
-  <div class="settings-grid" id="tp-settings"></div>
+    <p id="tp-settings-scope" class="tp-settings-scope d-none">この側の全レイヤー共通の設定です。Save All 後、実機への反映にはファームウェアの再ビルド・書き込みが必要です。</p>
+    <div class="settings-grid d-none" id="tp-settings"></div>
+  </div>
+  <div class="tp-footer"><span>割り当て：レイヤー別 ／ モード・感度：この側の全レイヤー共通</span><span>モード・感度はローカル設定。実機からは読み込まれません。</span></div>
   <div class="tab-palette-slot" id="pal-slot-trackpad"></div>
 </div>
 
@@ -841,6 +845,8 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
 </div>
 <div id="binding-picker-backdrop" class="d-none" style="position:fixed;inset:0;z-index:2999;" onclick="closeBindingPicker()"></div>
 
+<link rel="stylesheet" href="/static/trackpad-ui.css">
+<script src="/static/trackpad-ui.js"></script>
 <script>
 // 笏笏 螳壽焚 笏笏
 const MOD_PH = 'XXXXXXXX'; // 菫ｮ鬟ｾ繧ｭ繝ｼ繝ｩ繝・ヱ繝ｼ縺ｮ繝励Ξ繝ｼ繧ｹ繝帙Ν繝繝ｼ
@@ -1673,7 +1679,7 @@ const MAIN_SCHEMA=[
 function macroEmpty(i){ return {label:`mc${i}`,display_name:'',steps:[]}; }
 const state={
   layers:[],currentLayer:0,
-  tpSide:'left',tpConfigs:{left:{},right:{}},mainConfig:{},
+  tpSide:'left',tpView:'actions',tpSelected:'tap1',tpConfigs:{left:{},right:{}},mainConfig:{},
   configLoaded:{left:false,right:false,main:false},
   combos:[],
   conditionalLayers:[],
@@ -2031,7 +2037,7 @@ function mountPalette(){
   const slot=document.getElementById(`pal-slot-${targetTab}`);
   if(slot && palette.parentElement!==slot) slot.appendChild(palette);
   document.querySelectorAll('.tab-palette-slot').forEach(el=>el.classList.remove('active'));
-  const shouldShow=state.currentTab==='keymap' || (!!state.paletteContext && targetTab===state.currentTab);
+  const shouldShow=!!state.paletteContext && targetTab===state.currentTab;
   if(shouldShow && slot) slot.classList.add('active');
 }
 function refreshPaletteTargets(){
@@ -2252,7 +2258,8 @@ function applyDisplayedKeymap(layers, opts={}){
   if(opts.markAsSaved!==false) resetSavedSnapshot('all');
   refreshUnsavedUi();
   document.getElementById('file-status').textContent=opts.sourceLabel||'Displayed keymap';
-  document.getElementById('status-info').textContent=`${state.layers.length} layers / ${(state.layers[0]?.bindings||[]).length} keys`;
+  const bindingCount=(state.layers[0]?.bindings||[]).length;
+  document.getElementById('status-info').textContent=`${state.layers.length} layers / ${Math.min(bindingCount,52)} keys / ${Math.max(0,bindingCount-52)} trackpad inputs`;
   document.getElementById('no-data-box').classList.toggle('d-none',!!state.layers.length);
   document.getElementById('keyboard').classList.toggle('d-none',!state.layers.length);
   renderLayerBtns(); renderKeyboard(); renderPalette(); renderTpGestureKeys(); renderModTapTab(); renderComboTab(); renderConditionalTab(); renderMacroTab();
@@ -2282,7 +2289,14 @@ async function exportDisplayedKeymap(){
   URL.revokeObjectURL(url);
   setStatus('Exported displayed keymap.','s-ok');
 }
-async function loadConfig(side){
+const configLoads = new Map();
+function loadConfig(side){
+  if(configLoads.has(side)) return configLoads.get(side);
+  const pending=readConfig(side).finally(()=>configLoads.delete(side));
+  configLoads.set(side,pending);
+  return pending;
+}
+async function readConfig(side){
   const data=await api(`/api/config/${side}`); if(data.error){ setStatus(data.error,'s-err'); throw new Error(data.error); }
   if(side==='main'){ state.mainConfig=data.config||{}; state.configLoaded.main=true; if(document.getElementById('tab-general').classList.contains('active')) renderGeneralSettings(); }
   else { state.tpConfigs[side]=data.config||{}; state.configLoaded[side]=true; if(side===state.tpSide&&document.getElementById('tab-trackpad').classList.contains('active')) renderTpSettings(); }
@@ -2308,12 +2322,15 @@ function renderLayerBtns(){
 }
 function renderKeyboard(){
   const kb=document.getElementById('keyboard'); kb.innerHTML='';
-  kb.style.width=`${1300*SCALE}px`; kb.style.height=`${720*SCALE}px`;
+  kb.style.removeProperty('width'); kb.style.removeProperty('height');
+  const hardware=document.createElement('img'); hardware.src='/static/keyboard-hardware.png'; hardware.alt=''; hardware.className='keyboard-hardware'; kb.appendChild(hardware);
   const binds=state.layers[state.currentLayer]?.bindings||[];
-  KL.forEach((pos,idx)=>{
+  KL.forEach((originalPos,idx)=>{
+    if(idx>=52) return; // Keep virtual positions in the data, not the physical keyboard view.
+    const pos=keymapVisualPosition(idx);
     const b=binds[idx]||{raw:'&none'};
     const label=bindingLabel(b.raw),cls=bindingClass(b.raw);
-    const el=document.createElement('div');
+    const el=document.createElement('button'); el.type='button';
     el.className=`key ${cls}`; el.dataset.idx=idx;
     if(isLayerBindingChanged(state.currentLayer,idx)) el.classList.add('changed-outline','rpc');
     const mcTip=b.raw.match(MACRO_RE);
@@ -2326,10 +2343,13 @@ function renderKeyboard(){
     el.title=keyTitle;
     bindHoverCode(el,keyTitle);
     if(isPaletteTarget('key',{idx})) el.classList.add('pal-target');
-    el.style.left=`${pos.x*SCALE}px`; el.style.top=`${pos.y*SCALE}px`;
-    el.style.width=`${pos.w*SCALE-GAP}px`; el.style.height=`${pos.h*SCALE-GAP}px`;
-    if(pos.w<100) el.style.fontSize='8px';
-    const parts=label.split('\n');
+    el.setAttribute('aria-label',`キー ${idx}: ${label||'未割り当て'}`);
+    el.style.left=`${pos.x/1971*100}%`; el.style.top=`${pos.y/715*100}%`;
+    el.style.width=`${pos.w/1971*100}%`; el.style.height=`${pos.h/715*100}%`;
+    if(pos.angle) el.style.transform=`rotate(${pos.angle}deg)`;
+    if(idx>=42) el.classList.add('fiveway-key');
+    const compactDirection=idx>=42?({'&kp UP':'↑','&kp DOWN':'↓','&kp LEFT':'←','&kp RIGHT':'→'}[b.raw]):null;
+    const parts=(compactDirection||label).split('\n');
     const s1=document.createElement('span'); s1.className='key-lbl'; s1.textContent=parts[0]; el.appendChild(s1);
     if(parts[1]){ const s2=document.createElement('span'); s2.className='key-sub'; s2.textContent=parts[1]; el.appendChild(s2); }
     el.addEventListener('click',()=>openKeyEdit(idx));
@@ -2360,6 +2380,7 @@ function renderKeyboard(){
     });
     kb.appendChild(el);
   });
+  appendTrackpadEntrances(kb);
 }
 function setBinding(idx,raw){
   if(!state.layers[state.currentLayer]) return;
@@ -3238,64 +3259,7 @@ function makePalKey(raw,label,widthCls,extraCls='',onSelect=null,title='',disabl
 }
 
 // 笏笏 繝医Λ繝・け繝代ャ繝芽ｨｭ螳・笏笏
-function renderTpGestureKeys(){
-  const container=document.getElementById('tp-gesture-keys'); if(!container) return; container.innerHTML='';
-  const copyBtn=document.getElementById('tp-gesture-copy-btn');
-  if(copyBtn){
-    const other=state.tpSide==='left' ? 'right' : 'left';
-    copyBtn.textContent=`Copy to ${other}`;
-  }
-  const indices=TP_CLUSTER[state.tpSide];
-  if(!state.layers.length){ container.innerHTML='<span style="color:var(--dim);font-size:11px">Trackpad assignments will appear after the keymap is loaded.</span>'; return; }
-  const binds=state.layers[state.currentLayer]?.bindings||[];
-  indices.forEach((keyIdx,i)=>{
-    const b=binds[keyIdx]||{raw:'&trans'};
-    const meta=TP_GESTURES[i]||{slot:`TP${i+1}`,label:`Gesture ${i+1}`};
-    const item=document.createElement('div'); item.className='gest-item';
-    item.classList.toggle('pal-target',isPaletteTarget('gesture',{idx:keyIdx}));
-    const lbl=document.createElement('span'); lbl.className='gest-label'; lbl.textContent=TP_GESTURE_LABELS[i]||`繧ｸ繧ｧ繧ｹ繝√Ε繝ｼ ${i+1}`;
-    lbl.textContent=`${meta.slot}: ${meta.label}`;
-    const keyEl=document.createElement('div'); keyEl.className=`gest-key ${bindingClass(b.raw)}`; keyEl.textContent=bindingLabel(b.raw); keyEl.title=b.raw;
-    if(isLayerBindingChanged(state.currentLayer,keyIdx)) keyEl.classList.add('changed-outline','rpc');
-    item.appendChild(lbl); item.appendChild(keyEl);
-    const applyGestureBinding=(raw)=>{
-      setBinding(keyIdx,raw);
-      if(needsFollowUpPicker(raw)){
-        openTemplateFollowUpPicker({
-          tab:'trackpad',
-          title:`${meta.slot} に使うキーを選択`,
-          note:'Quantum のテンプレートに埋め込むキーを選びます。',
-          target:{type:'gesture',idx:keyIdx},
-          template:raw,
-          onComplete:(completed)=>{ setBinding(keyIdx,completed); clearPaletteContext(); },
-        });
-      } else {
-        clearPaletteContext();
-      }
-    };
-    item.onclick=()=>{
-      if(isPaletteTarget('gesture',{idx:keyIdx})){ clearPaletteContext(); return; }
-      activatePaletteContext({
-        tab:'trackpad',
-        title:`${meta.slot} の割り当て`,
-        note:'下のパレットからキーをドラッグするか、クリックで割り当てます。',
-        catIds:DEFAULT_BINDING_CAT_IDS,
-        initialCat:'basic',
-        target:{type:'gesture',idx:keyIdx},
-        onPick:applyGestureBinding,
-      });
-    };
-    item.addEventListener('dragover',e=>{ e.preventDefault(); item.classList.add('pal-target'); });
-    item.addEventListener('dragleave',()=>item.classList.toggle('pal-target',isPaletteTarget('gesture',{idx:keyIdx})));
-    item.addEventListener('drop',e=>{
-      e.preventDefault();
-      const raw=e.dataTransfer.getData('text/plain');
-      if(!raw) return;
-      applyGestureBinding(raw);
-    });
-    container.appendChild(item);
-  });
-}
+function renderTpGestureKeys(){ renderTpActions(); }
 function copyCurrentTpGestureBindings(){
   const other=state.tpSide==='left' ? 'right' : 'left';
   copyTpGestureBindings(state.tpSide, other);
@@ -3481,14 +3445,15 @@ function renderSettingsGrid(schema,cfgObj,cid){
       if(row.desc){lbl.classList.add('has-tip');lbl.title=row.desc;}
       r.appendChild(lbl);
       syncSettingRowChanged(r,row,cid,configSide);
-      if(row.type==='bool'){ const lw=document.createElement('label'); lw.className='toggle'; const inp=document.createElement('input'); inp.type='checkbox'; inp.checked=cfgObj[row.key]==='y'; inp.onchange=()=>{ cfgObj[row.key]=inp.checked?'y':'n'; markUnsaved(); syncSettingRowChanged(r,row,cid,configSide); }; const sl=document.createElement('span'); sl.className='tsl'; lw.appendChild(inp); lw.appendChild(sl); r.appendChild(lw); }
-      else if(row.type==='num'){ const inp=document.createElement('input'); inp.type='number'; inp.className='snum'; inp.value=cfgObj[row.key]||''; if(row.min!==undefined) inp.min=row.min; if(row.max!==undefined) inp.max=row.max; inp.oninput=()=>{ cfgObj[row.key]=inp.value; markUnsaved(); syncSettingRowChanged(r,row,cid,configSide); }; r.appendChild(inp); }
+      if(row.type==='bool'){ const lw=document.createElement('label'); lw.className='toggle'; const inp=document.createElement('input'); inp.type='checkbox'; inp.setAttribute('aria-label',`${sect.titleJa||TP_SECTION_JA[sect.title]||sect.title} ${row.ja||TP_LABEL_JA[row.label]||row.label}`); inp.checked=cfgObj[row.key]==='y'; inp.onchange=()=>{ cfgObj[row.key]=inp.checked?'y':'n'; markUnsaved(); syncSettingRowChanged(r,row,cid,configSide); }; const sl=document.createElement('span'); sl.className='tsl'; lw.appendChild(inp); lw.appendChild(sl); r.appendChild(lw); }
+      else if(row.type==='num'){ const inp=document.createElement('input'); inp.type='number'; inp.className='snum'; inp.setAttribute('aria-label',`${sect.titleJa||TP_SECTION_JA[sect.title]||sect.title} ${row.ja||TP_LABEL_JA[row.label]||row.label}`); inp.value=cfgObj[row.key]||''; if(row.min!==undefined) inp.min=row.min; if(row.max!==undefined) inp.max=row.max; inp.oninput=()=>{ cfgObj[row.key]=inp.value; markUnsaved(); syncSettingRowChanged(r,row,cid,configSide); }; r.appendChild(inp); }
       else if(row.type==='slider'){
         const wrap=document.createElement('div');
         wrap.className='slider-wrap';
         const range=document.createElement('input');
         range.type='range';
         range.className='srange';
+        range.setAttribute('aria-label',`${sect.titleJa||TP_SECTION_JA[sect.title]||sect.title} ${row.ja||TP_LABEL_JA[row.label]||row.label}`);
         range.min=row.min;
         range.max=row.max;
         range.step=row.step||1;
@@ -3532,7 +3497,7 @@ function renderSettingsGrid(schema,cfgObj,cid){
     container.appendChild(div);
   });
 }
-function renderTpSettings(){ renderTpGestureKeys(); renderSettingsGrid(TP_SCHEMA,state.tpConfigs[state.tpSide],'tp-settings'); }
+function renderTpSettings(){ renderTpWorkspace(); }
 function renderGeneralSettings(){ renderSettingsGrid(MAIN_SCHEMA,state.mainConfig,'general-settings'); }
 function makeConditionalName(ifLayers, thenLayer, fallbackIndex){
   const src=(ifLayers||[]).join('_') || `rule_${fallbackIndex+1}`;
@@ -3634,7 +3599,7 @@ function switchTab(name){
   document.querySelectorAll('.tab-pane').forEach(t=>t.classList.remove('active'));
   document.getElementById(`tab-${name}`).classList.add('active');
   renderPalette();
-  if(name==='trackpad'){ renderTpGestureKeys(); if(state.configLoaded[state.tpSide]) renderTpSettings(); }
+  if(name==='trackpad'){ renderTpSettings(); if(!state.configLoaded[state.tpSide]) loadConfig(state.tpSide).catch(()=>renderTpSettings()); }
   if(name==='general'&&state.configLoaded.main) renderGeneralSettings();
   if(name==='conditional') renderConditionalTab();
   if(name==='modtap') renderModTapTab();
@@ -3642,16 +3607,16 @@ function switchTab(name){
   if(name==='macro') renderMacroTab();
 }
 function switchLayer(n){
+  clearTpEditingContext();
   state.currentLayer=n;
   document.querySelectorAll('.lbtn[data-layer-idx]').forEach(b=>b.classList.toggle('active',+b.dataset.layerIdx===n));
   if(state.layers.length){ renderKeyboard(); renderTpGestureKeys(); }
 }
 function switchTpSide(side){
+  clearTpEditingContext();
   state.tpSide=side;
-  document.querySelectorAll('.tp-btn').forEach((b,i)=>b.classList.toggle('active',['left','right'][i]===side));
-  renderTpGestureKeys();
-  if(state.configLoaded[side]) renderTpSettings();
-  else loadConfig(side);
+  renderTpSettings();
+  if(!state.configLoaded[side]) loadConfig(side).catch(()=>renderTpSettings());
 }
 
 // 笏笏 繧ｭ繝ｼ繝懊・繝峨す繝ｧ繝ｼ繝医き繝・ヨ 笏笏

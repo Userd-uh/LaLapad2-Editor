@@ -3,7 +3,7 @@ const fs = require('fs');
 const vm = require('vm');
 
 const html = fs.readFileSync('templates/index.html', 'utf8');
-const script = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)][0][1];
+const script = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)].map(match=>match[1]).join('\n');
 const start = script.indexOf('function bindingKey');
 const end = script.indexOf('function deviceBindingToRaw');
 
