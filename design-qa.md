@@ -30,6 +30,7 @@ Desktop and narrow captures have one screenshot pixel per CSS pixel. The full co
 2. Revised comparison (`comparison-desktop-final.png`, `comparison-detail-final.png`): the editor now occupies approximately 38% of the content area, consistent with the mock's hierarchy; primary assignment action is visible. No remaining actionable P0/P1/P2 visual findings.
 3. During interaction checks, the macro shortcut opened Basic because it used `macro` instead of the existing `macro_pal` category ID. Fixed and verified that mc0–mc15 appear. This was a functional finding, not a visual-comparison iteration.
 4. The five-way arrow labels were truncated at their physical positions. Native arrow-key text now uses arrows while accessible names and binding tooltips retain the full meaning. The final Keymap capture verifies this.
+5. Follow-up symmetry correction: the right hardware image is now a pixel-exact horizontal reflection of the aligned left half. All 26 physical control pairs and the two trackpad entrances use the same mirror transform; the final browser measurement differed by at most 0.03125 CSS pixels from the mathematical mirror due to subpixel layout rounding.
 
 ## Required fidelity surfaces
 
@@ -64,6 +65,7 @@ Browser checks on the actual running application:
 - Changing two-finger horizontal mode from keys to scroll hides directional actions, preserves saved Right/Left bindings, and restores them when switched back.
 - Macro picker opens the macro category; switching sides closes the stale picker.
 - Physical Q key edited to A through the existing palette.
+- Hardware raster mirror comparison returned no differing pixels; all right-side key and pad coordinates are derived from their left-side counterparts.
 - Narrow-screen selection reaches the action editor; sensitivity controls remain readable.
 - Captured browser console warnings/errors: none.
 - All browser-only test changes discarded by reload; no Save All, MCU load/write or firmware write performed.

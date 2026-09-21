@@ -59,6 +59,18 @@ vm.runInContext(`
   const physical=Array.from({length:52},(_,i)=>keymapVisualPosition(i));
   assert.equal(new Set(physical.map(p=>p.x+':'+p.y)).size,52);
   for(const p of physical)assert.ok(p.x>=0&&p.y>=0&&p.x+p.w<=1971&&p.y+p.h<=715);
+  // The right half is the exact horizontal mirror of the cleanly aligned left half.
+  const pairs=[];
+  for(let row=0;row<3;row++)for(let col=0;col<5;col++)pairs.push([row*10+col,row*10+9-col]);
+  for(let i=0;i<6;i++)pairs.push([30+i,41-i]);
+  pairs.push([42,51],[43,48],[44,49],[45,50],[46,47]);
+  for(const [left,right] of pairs){
+    const a=physical[left],b=physical[right];
+    assert.equal(b.x,1971-a.x-a.w,'x mirror '+left+'/'+right);
+    assert.equal(b.y,a.y,'y mirror '+left+'/'+right);
+    assert.equal(b.w,a.w);assert.equal(b.h,a.h);
+    assert.equal((b.angle||0)+(a.angle||0),0,'angle mirror '+left+'/'+right);
+  }
 `,ctx);
 // A stale palette callback cannot edit a different side, layer, or operation.
 vm.runInContext("pickTpCustomBinding({idx:52,label:'1本指でタップ'},'basic')",ctx);

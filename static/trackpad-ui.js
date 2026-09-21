@@ -1,18 +1,28 @@
 /* Presentation only: bindings retain their original firmware positions. */
+const KEYBOARD_VISUAL_WIDTH=1971;
+function mirrorKeymapPosition(pos){
+  return {...pos,x:KEYBOARD_VISUAL_WIDTH-pos.x-pos.w,angle:pos.angle?-pos.angle:pos.angle};
+}
 function keymapVisualPosition(index){
   const topLeft=[[49,113],[170,90],[292,65],[409,80],[525,106]];
-  const topRight=[[1307,121],[1424,99],[1544,84],[1663,104],[1785,133]];
   if(index<30){
-    const col=index%10, row=Math.floor(index/10), [x,y]=(col<5?topLeft:topRight)[col%5];
-    return {x:x-row*8,y:y+row*119,w:104,h:103};
+    const col=index%10, row=Math.floor(index/10);
+    const [x,y]=topLeft[col<5?col:9-col];
+    const pos={x:x-row*8,y:y+row*119,w:104,h:103};
+    return col<5?pos:mirrorKeymapPosition(pos);
   }
-  const thumbs=[[20,474],[143,445],[263,428],[476,474],[614,462,18],[750,519,27],
-    [1050,511,-25],[1190,477,-17],[1340,493],[1580,476],[1715,485],[1842,505]];
-  if(index<42){const [x,y,angle]=thumbs[index-30];return {x,y,w:100,h:100,angle};}
+  const leftThumbs=[[20,474],[143,445],[263,428],[476,474],[614,462,18],[750,519,27]];
+  if(index<42){
+    const leftIndex=index<36?index-30:41-index;
+    const [x,y,angle]=leftThumbs[leftIndex],pos={x,y,w:100,h:100,angle};
+    return index<36?pos:mirrorKeymapPosition(pos);
+  }
   // Matrix order is center/right/down/left/up on left, up/left/down/right/center on right.
-  const cross=[[0,0],[32,0],[0,32],[-32,0],[0,-32],[0,-32],[-32,0],[0,32],[32,0],[0,0]];
-  const [dx,dy]=cross[index-42];
-  return {x:(index<47?400:1489)+dx,y:490+dy,w:30,h:30};
+  const leftCross=[[0,0],[32,0],[0,32],[-32,0],[0,-32]];
+  const rightToLeft={47:46,48:43,49:44,50:45,51:42};
+  const sourceIndex=index<47?index:rightToLeft[index];
+  const [dx,dy]=leftCross[sourceIndex-42],pos={x:400+dx,y:490+dy,w:30,h:30};
+  return index<47?pos:mirrorKeymapPosition(pos);
 }
 function tpNode(tag,className,text){
   const node=document.createElement(tag);
@@ -26,7 +36,8 @@ function tpButton(text,handler,className='btn'){
 function tpSideName(side=state.tpSide){return side==='left'?'左':'右';}
 function appendTrackpadEntrances(keyboard){
   for(const side of ['left','right']){
-    const pos=side==='left'?{x:636,y:85,w:263,h:329}:{x:1028,y:117,w:263,h:329};
+    const leftPos={x:636,y:85,w:263,h:329};
+    const pos=side==='left'?leftPos:mirrorKeymapPosition(leftPos);
     const button=tpButton('',()=>openTrackpad(side),'trackpad-entrance');
     button.dataset.trackpadSide=side;
     button.setAttribute('aria-label',`${tpSideName(side)}トラックパッドの設定を開く`);
