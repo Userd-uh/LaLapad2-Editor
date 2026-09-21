@@ -136,7 +136,7 @@ function renderTpActions(){
   const panel=document.getElementById('tp-action-editor');
   container.replaceChildren();
   const copy=document.getElementById('tp-gesture-copy-btn');
-  copy.textContent=`このレイヤーの割り当てを${state.tpSide==='left'?'右':'左'}へコピー`;
+  copy.textContent=`選択中レイヤーのキー割り当てを${state.tpSide==='left'?'右':'左'}へコピー`;
   copy.disabled=!state.layers.length;
   if(!state.layers.length || !state.configLoaded[state.tpSide]){
     container.appendChild(tpNode('p','tp-empty',!state.layers.length?'キーマップを読み込むと操作の割り当てが表示されます。':'この側の設定を読み込めません。フォルダー設定を確認して、左右を選び直してください。'));
@@ -177,7 +177,7 @@ function pickTpCustomBinding(row,category){
 function renderTpActionEditor(row,cfg,bindings){
   const panel=document.getElementById('tp-action-editor');panel.replaceChildren();
   const scope=tpEditScope();
-  panel.append(tpNode('h3','',row.idx===undefined?'動作を選択':'割り当てを選択'),tpNode('p','tp-editor-context',`${tpSideName()} / レイヤー ${state.currentLayer} / ${row.label}`));
+  panel.append(tpNode('h3','',row.idx===undefined?'動作を選択':'割り当てを選択'),tpNode('p','tp-editor-context',`${tpSideName()} / キー割り当てレイヤー ${state.currentLayer} / ${row.label}`));
   if(row.idx===undefined){
     const select=tpNode('select','sselect tp-mode-select');select.setAttribute('aria-label',`${row.label}のモード`);
     for(const [value,label] of [['1',row.axis==='vertical'?'縦スクロール':'横スクロール'],['2','キー操作'],['0','無効']]){

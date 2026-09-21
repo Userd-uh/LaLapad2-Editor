@@ -31,6 +31,7 @@ Desktop and narrow captures have one screenshot pixel per CSS pixel. The full co
 3. During interaction checks, the macro shortcut opened Basic because it used `macro` instead of the existing `macro_pal` category ID. Fixed and verified that mc0–mc15 appear. This was a functional finding, not a visual-comparison iteration.
 4. The five-way arrow labels were truncated at their physical positions. Native arrow-key text now uses arrows while accessible names and binding tooltips retain the full meaning. The final Keymap capture verifies this.
 5. Follow-up symmetry correction: the right hardware image is now a pixel-exact horizontal reflection of the aligned left half. All 26 physical control pairs and the two trackpad entrances use the same mirror transform; the final browser measurement differed by at most 0.03125 CSS pixels from the mathematical mirror due to subpixel layout rounding.
+6. Follow-up scope clarification: Trackpad now states that layers change only the gesture's key assignment. The selector is labeled `キー割り当てのレイヤー`; detection, mode and sensitivity are explicitly identified as shared across all layers.
 
 ## Required fidelity surfaces
 

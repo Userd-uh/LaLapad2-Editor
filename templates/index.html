@@ -553,7 +553,8 @@ header h1{font-size:15px;font-weight:700;color:var(--accent);white-space:nowrap;
   </div>
   <div class="tp-scroll">
     <div id="tp-actions">
-      <div class="tp-action-toolbar"><div class="layer-bar" id="tp-layer-bar"></div><button class="btn sm" id="tp-gesture-copy-btn" onclick="copyCurrentTpGestureBindings()">このレイヤーの割り当てを右へコピー</button></div>
+      <p class="tp-action-scope"><strong>レイヤーで変わるのはキー割り当てだけです。</strong><span>タップやスワイプの判定方法、モード、感度はこの側の全レイヤーで共通です。</span></p>
+      <div class="tp-action-toolbar"><div class="layer-bar" id="tp-layer-bar"></div><button class="btn sm" id="tp-gesture-copy-btn" onclick="copyCurrentTpGestureBindings()">選択中レイヤーのキー割り当てを右へコピー</button></div>
       <div class="tp-actions-layout">
         <div id="tp-gesture-keys" class="tp-action-list" aria-label="操作と割り当て"></div>
         <aside id="tp-action-editor" class="tp-action-editor" aria-label="選択した操作の編集"></aside>
@@ -2309,7 +2310,8 @@ function renderLayerBtns(){
   ['layer-bar','tp-layer-bar'].forEach(id=>{
     const bar=document.getElementById(id);
     if(!bar) return;
-    bar.innerHTML='<span style="color:var(--dim);font-size:11px">Layer:</span>';
+    const label=id==='tp-layer-bar'?'キー割り当てのレイヤー:':'Layer:';
+    bar.innerHTML=`<span style="color:var(--dim);font-size:11px">${label}</span>`;
     state.layers.forEach((l,i)=>{
       const b=document.createElement('button');
       b.className='lbtn'+(i===state.currentLayer?' active':'');
