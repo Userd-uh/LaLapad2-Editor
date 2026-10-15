@@ -1379,15 +1379,19 @@ def extract_macro_definitions(content):
 # Keymap writing
 # ──────────────────────────────────────────────
 
-ROW_SIZES = [10, 10, 10, 12, 10, 6, 10]  # total = 68
+ROW_SIZES = [10, 10, 10, 12, 10, 6, 10, 8]  # append-only 3F positions, total = 76
 
 
 def format_bindings(bindings):
     rows, i = [], 0
     for n in ROW_SIZES:
         chunk = bindings[i:i + n]
+        if not chunk:
+            break
         rows.append('            ' + '  '.join(b['raw'] for b in chunk))
         i += n
+    if i < len(bindings):
+        raise ValueError('Unsupported key count; refusing to truncate bindings.')
     return '\n'.join(rows)
 
 
