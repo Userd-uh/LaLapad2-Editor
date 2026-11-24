@@ -56,6 +56,7 @@
 .tp-editor-secondary{width:100%;margin-top:12px;white-space:normal;padding:10px;font-size:12px;}
 .tp-shortcut{margin-bottom:14px;}
 .tp-shortcut summary{cursor:pointer;color:var(--accent);padding:10px 0;font-weight:600;}
+.tp-shortcut-right summary{font-weight:400;padding:0 0 10px;}
 .tp-shortcut fieldset{border:0;display:flex;flex-wrap:wrap;gap:8px 16px;margin:0 0 12px;padding:0;}
 .tp-shortcut legend{margin-bottom:6px;}
 .tp-shortcut label{display:inline-flex;align-items:center;gap:6px;}

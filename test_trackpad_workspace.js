@@ -48,6 +48,7 @@ vm.runInContext(`
   const shortcut=tpShortcutBinding('T',['LC','LS']);
   assert.equal(shortcut,'&kp LC(LS(T))');
   assert.equal(tpBindingName(shortcut),'Ctrl + Shift + T');
+  assert.equal(tpBindingName(tpShortcutBinding('T',['LC','RS'])),'Ctrl + 右 Shift + T');
   // Every old settings row has a destination exactly once (no silent losses).
   const settings=tpSettingsSchema('feel').concat(tpSettingsSchema('advanced')).flatMap(s=>s.rows);
   const actionKeys=new Set(tpActionRows('left',modes).flatMap(r=>[r.enableKey,r.modeKey]).filter(Boolean));

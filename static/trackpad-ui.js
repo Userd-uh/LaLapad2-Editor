@@ -89,9 +89,9 @@ function tpBindingName(raw){
   if(names[raw]) return names[raw];
   const modifiers={LCTRL:'Ctrl',LEFT_CONTROL:'Ctrl',RCTRL:'右Ctrl',RIGHT_CONTROL:'右Ctrl',LALT:'Alt',LEFT_ALT:'Alt',RALT:'右Alt',RIGHT_ALT:'右Alt',LWIN:'Win',LGUI:'Win',LEFT_GUI:'Win',LSHIFT:'Shift',LEFT_SHIFT:'Shift'};
   if(raw.startsWith('&kp ') && modifiers[raw.slice(4)]) return modifiers[raw.slice(4)];
-  const shortcut=raw.match(/^&kp ((?:L[CSAG]\()+)([A-Z0-9_]+)(\)+)$/);
+  const shortcut=raw.match(/^&kp ((?:[LR][CSAG]\()+)([A-Z0-9_]+)(\)+)$/);
   if(shortcut){
-    const prefixes=shortcut[1].match(/L[CSAG]/g);
+    const prefixes=shortcut[1].match(/[LR][CSAG]/g);
     if(prefixes.length===shortcut[3].length){
       const labels=new Map(TP_SHORTCUT_MODIFIERS);
       return [...prefixes.map(prefix=>labels.get(prefix)),bindingLabel('&kp '+shortcut[2]).replace(/\n/g,' ')].join(' + ');
@@ -183,7 +183,10 @@ function pickTpCustomBinding(row,category){
     else apply(raw);
   }});
 }
-const TP_SHORTCUT_MODIFIERS=[['LC','Ctrl'],['LS','Shift'],['LA','Alt'],['LG','Win']];
+const TP_SHORTCUT_MODIFIERS=[
+  ['LC','Ctrl'],['LS','Shift'],['LA','Alt'],['LG','Win'],
+  ['RC','右 Ctrl'],['RS','右 Shift'],['RA','右 Alt'],['RG','右 Win'],
+];
 function tpShortcutBinding(key,modifiers){
   return '&kp '+modifiers.reduceRight((binding,modifier)=>`${modifier}(${binding})`,key);
 }
@@ -194,14 +197,21 @@ function renderTpShortcut(row,raw,scope){
   form.appendChild(tpNode('p','','例：Ctrl と Shift にチェックを入れ、T を選ぶと Ctrl + Shift + T になります。'));
   const group=tpNode('fieldset');
   group.appendChild(tpNode('legend','','修飾キー'));
+  const right=tpNode('details','tp-shortcut-right');
+  right.appendChild(tpNode('summary','','右側の修飾キー'));
+  const rightGroup=tpNode('fieldset');
+  rightGroup.setAttribute('aria-label','右側の修飾キー');
+  right.appendChild(rightGroup);
   const match=raw.match(/^&kp\s+(\S+)$/);
   const usage=match ? keycodeToHidUsage(match[1]) : null;
   const mods=usage===null ? 0 : usage>>>24;
+  right.open=Boolean(mods&0xf0);
   const inputs=TP_SHORTCUT_MODIFIERS.map(([modifier,name])=>{
     const label=tpNode('label'),input=tpNode('input');
     input.type='checkbox';
-    input.checked=Boolean(mods&HID_USAGE_MODIFIERS[modifier]) && !(mods&0xf0);
-    label.append(input,name);group.appendChild(label);
+    input.checked=Boolean(mods&HID_USAGE_MODIFIERS[modifier]);
+    label.append(input,name);
+    (modifier.startsWith('R') ? rightGroup : group).appendChild(label);
     return input;
   });
   const key=tpNode('select','sselect');
@@ -213,7 +223,7 @@ function renderTpShortcut(row,raw,scope){
     const option=tpNode('option','',bindingLabel('&kp '+code).replace(/\n/g,' '));
     option.value=code;key.appendChild(option);
   }
-  key.value=usage!==null && !(mods&0xf0) ? HID_USAGE_KEYCODE.get(usage&0xffff)||'' : '';
+  key.value=usage!==null ? HID_USAGE_KEYCODE.get(usage&0xffff)||'' : '';
   if(key.selectedIndex<0) key.value='';
   const preview=tpNode('output');
   const apply=tpNode('button','btn primary tp-apply','このショートカットを割り当て');
@@ -233,7 +243,7 @@ function renderTpShortcut(row,raw,scope){
     setBinding(row.idx,tpShortcutBinding(key.value,selectedModifiers().map(([modifier])=>modifier)));
     setStatus(`${row.label} に ${name} を割り当てました。`,'s-ok');
   };
-  form.append(group,key,preview,apply);
+  form.append(group,right,key,preview,apply);
   details.appendChild(form);
   updatePreview();
   return details;

@@ -68,9 +68,38 @@ context.callDeviceRpc=async request=>{
   requests.push(request);
   return {keymap:{getKeymap:{layers:[{bindings:Array(68).fill({})}]}}};
 };
-vm.runInContext('applyKeymapToDevice()',context).then(result=>{
+vm.runInContext('applyKeymapToDevice()',context).then(async result=>{
   assert.match(result.error,/76-position firmware/);
   assert.equal(requests.length,1);
   assert.equal(requests[0].keymap.getKeymap,true);
   console.log('Old-firmware RPC preflight rejects before any writes OK');
+
+  vm.runInContext('const SHIFTED_KEY_ALIASES={};'+
+    part('function bindingKey(', 'function deviceBindingToRaw(')+
+    part('function collectDisplayedLayerBindingWrites(', 'async function applyKeymapToDevice('),context);
+  const transparent={behaviorId:1,param1:0,param2:0};
+  const remote={layers:[{id:7,bindings:Array(76).fill(transparent)}]};
+  const position=vm.runInContext("gestureActionPosition('left',3,'down')",context);
+  context.state.layers[0].bindings[position]={raw:'&kp LC(LS(T))'};
+  context.loadDeviceBehaviors=async()=>{};
+  context.loadDevicePhysicalLayouts=async()=>{};
+  context.buildDeviceEditorPositionMap=()=>({editorToDevice:{}});
+  context.buildRawBindingMap=()=>({rawMap:new Map([['&trans',transparent]]),behaviorIdsByLabel:new Map([['kp',12]])});
+  context.deepClone=value=>JSON.parse(JSON.stringify(value));
+  requests.length=0;
+  context.callDeviceRpc=async request=>{
+    requests.push(JSON.parse(JSON.stringify(request)));
+    if(request.keymap.getKeymap) return {keymap:{getKeymap:remote}};
+    if(request.keymap.setLayerBinding) return {keymap:{setLayerBinding:0}};
+    return {keymap:{saveChanges:{}}};
+  };
+  const written=await vm.runInContext('applyKeymapToDevice({quiet:true})',context);
+  assert.equal(written.changedCount,1,JSON.stringify(written));
+  assert.equal(written.unsupportedCount,0);
+  assert.deepEqual(requests,[
+    {keymap:{getKeymap:true}},
+    {keymap:{setLayerBinding:{layerId:7,keyPosition:position,binding:{behaviorId:12,param1:0x03070017,param2:0}}}},
+    {keymap:{saveChanges:true}},
+  ]);
+  console.log('Shortcut RPC write sends the expected gesture position and HID modifiers');
 }).catch(error=>{console.error(error);process.exitCode=1;});

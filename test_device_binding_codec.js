@@ -11,11 +11,20 @@ assert(start >= 0 && end > start, 'Device binding codec source was not found');
 
 const tests = `
 const ids = new Map([
+  ['kp', 12],
   ['zip_dyn_scale', 39],
   ['layer_overlay_secondary', 40],
   ['layer_overlay_tertiary', 41],
   ['layer_overlay_secondary_space', 42],
 ]);
+assert.deepStrictEqual(
+  bindingFromParsedRaw(parseRawBinding('&kp LC(LS(T))'), ids, {}),
+  {behaviorId: 12, param1: 0x03070017, param2: 0}
+);
+assert.deepStrictEqual(
+  bindingFromParsedRaw(parseRawBinding('&kp LC(RS(T))'), ids, {}),
+  {behaviorId: 12, param1: 0x21070017, param2: 0}
+);
 assert.deepStrictEqual(
   bindingFromParsedRaw(parseRawBinding('&zip_dyn_scale ZDS_SC ZDS_DEC'), ids, {}),
   {behaviorId: 39, param1: 1, param2: 2}
