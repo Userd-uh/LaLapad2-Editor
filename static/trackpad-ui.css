@@ -15,7 +15,7 @@
 .keyboard-help strong{color:var(--text);font-size:15px;display:block;}
 #tab-keymap .split{flex:1;}
 #tab-trackpad{background:#0c1420;}
-.tp-header{padding:26px 28px 22px;display:flex;justify-content:space-between;align-items:center;gap:18px;flex-shrink:0;}
+.tp-header{padding:26px 28px 22px;display:flex;align-items:center;gap:clamp(18px,3vw,56px);flex-shrink:0;}
 .tp-header h2{font-size:clamp(21px,2.2vw,29px);font-weight:650;letter-spacing:.02em;}
 .tp-header p{color:var(--dim);margin-top:9px;font-size:13px;}
 .tp-side-controls{display:flex;align-items:center;gap:6px;}
@@ -28,6 +28,7 @@
 .tp-purpose button{background:none;color:var(--dim);border:0;border-bottom:3px solid transparent;padding:14px 8px;font-size:14px;cursor:pointer;}
 .tp-purpose button[aria-pressed=true]{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
 .tp-scroll{overflow-y:auto;flex:1;min-height:0;}
+#tp-action-controls{flex-shrink:0;border-bottom:1px solid var(--bdr);}
 .tp-action-scope{display:flex;gap:9px;align-items:baseline;padding:16px 28px 0;color:var(--dim);font-size:12px;line-height:1.6;flex-wrap:wrap;}
 .tp-action-scope strong{color:var(--text);font-size:13px;}
 .tp-action-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:15px 28px 12px;flex-wrap:wrap;}
@@ -52,6 +53,14 @@
 .tp-choice input{accent-color:var(--a2);width:17px;height:17px;}
 .tp-apply{width:100%;margin-top:14px;padding:12px;font-size:14px;font-weight:600;}
 .tp-editor-secondary{width:100%;margin-top:12px;white-space:normal;padding:10px;font-size:12px;}
+.tp-shortcut{margin-bottom:14px;}
+.tp-shortcut summary{cursor:pointer;color:var(--accent);padding:10px 0;font-weight:600;}
+.tp-shortcut fieldset{border:0;display:flex;flex-wrap:wrap;gap:8px 16px;margin:0 0 12px;padding:0;}
+.tp-shortcut legend{margin-bottom:6px;}
+.tp-shortcut label{display:inline-flex;align-items:center;gap:6px;}
+.tp-shortcut input{accent-color:var(--a2);}
+.tp-shortcut select{margin:0;}
+.tp-shortcut output{display:block;margin-top:10px;color:var(--accent);}
 .tp-editor-enable{border-bottom:1px solid var(--bdr);padding-bottom:12px;margin-bottom:8px;}
 .tp-mode-select{width:100%;font-size:14px;padding:10px;margin-bottom:10px;}
 .tp-inactive-bindings{border-top:1px solid var(--bdr);margin-top:18px;padding-top:14px;font-size:12px;color:var(--dim);line-height:1.8;}

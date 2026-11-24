@@ -89,6 +89,14 @@ function tpBindingName(raw){
   if(names[raw]) return names[raw];
   const modifiers={LCTRL:'Ctrl',LEFT_CONTROL:'Ctrl',RCTRL:'右Ctrl',RIGHT_CONTROL:'右Ctrl',LALT:'Alt',LEFT_ALT:'Alt',RALT:'右Alt',RIGHT_ALT:'右Alt',LWIN:'Win',LGUI:'Win',LEFT_GUI:'Win',LSHIFT:'Shift',LEFT_SHIFT:'Shift'};
   if(raw.startsWith('&kp ') && modifiers[raw.slice(4)]) return modifiers[raw.slice(4)];
+  const shortcut=raw.match(/^&kp ((?:L[CSAG]\()+)([A-Z0-9_]+)(\)+)$/);
+  if(shortcut){
+    const prefixes=shortcut[1].match(/L[CSAG]/g);
+    if(prefixes.length===shortcut[3].length){
+      const labels=new Map(TP_SHORTCUT_MODIFIERS);
+      return [...prefixes.map(prefix=>labels.get(prefix)),bindingLabel('&kp '+shortcut[2]).replace(/\n/g,' ')].join(' + ');
+    }
+  }
   const macro=raw.match(/^&mc(\d+)$/);
   if(macro) return state.macroDefs?.[+macro[1]]?.display_name||`マクロ ${macro[1]}`;
   const td=raw.match(/^&td(\d+)$/);
@@ -124,6 +132,7 @@ function renderTpWorkspace(){
   });
   document.querySelectorAll('[data-tp-view]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.tpView===state.tpView)));
   const actions=state.tpView==='actions';
+  document.getElementById('tp-action-controls').classList.toggle('d-none',!actions);
   document.getElementById('tp-actions').classList.toggle('d-none',!actions);
   document.getElementById('tp-settings').classList.toggle('d-none',actions);
   document.getElementById('tp-settings-scope').classList.toggle('d-none',actions);
@@ -174,6 +183,61 @@ function pickTpCustomBinding(row,category){
     else apply(raw);
   }});
 }
+const TP_SHORTCUT_MODIFIERS=[['LC','Ctrl'],['LS','Shift'],['LA','Alt'],['LG','Win']];
+function tpShortcutBinding(key,modifiers){
+  return '&kp '+modifiers.reduceRight((binding,modifier)=>`${modifier}(${binding})`,key);
+}
+function renderTpShortcut(row,raw,scope){
+  const details=tpNode('details','tp-shortcut');
+  details.appendChild(tpNode('summary','','複数キーのショートカットを設定'));
+  const form=tpNode('form');
+  form.appendChild(tpNode('p','','例：Ctrl と Shift にチェックを入れ、T を選ぶと Ctrl + Shift + T になります。'));
+  const group=tpNode('fieldset');
+  group.appendChild(tpNode('legend','','修飾キー'));
+  const match=raw.match(/^&kp\s+(\S+)$/);
+  const usage=match ? keycodeToHidUsage(match[1]) : null;
+  const mods=usage===null ? 0 : usage>>>24;
+  const inputs=TP_SHORTCUT_MODIFIERS.map(([modifier,name])=>{
+    const label=tpNode('label'),input=tpNode('input');
+    input.type='checkbox';
+    input.checked=Boolean(mods&HID_USAGE_MODIFIERS[modifier]) && !(mods&0xf0);
+    label.append(input,name);group.appendChild(label);
+    return input;
+  });
+  const key=tpNode('select','sselect');
+  key.setAttribute('aria-label','組み合わせるキー');
+  const placeholder=tpNode('option','','組み合わせるキーを選択');
+  placeholder.value='';key.appendChild(placeholder);
+  for(const [id,code] of HID_USAGE_KEYCODE){
+    if(id>=0xe0 && id<=0xe7) continue;
+    const option=tpNode('option','',bindingLabel('&kp '+code).replace(/\n/g,' '));
+    option.value=code;key.appendChild(option);
+  }
+  key.value=usage!==null && !(mods&0xf0) ? HID_USAGE_KEYCODE.get(usage&0xffff)||'' : '';
+  if(key.selectedIndex<0) key.value='';
+  const preview=tpNode('output');
+  const apply=tpNode('button','btn primary tp-apply','このショートカットを割り当て');
+  const selectedModifiers=()=>TP_SHORTCUT_MODIFIERS.filter((_,index)=>inputs[index].checked);
+  function updatePreview(){
+    const selected=selectedModifiers();
+    apply.disabled=!key.value || !selected.length;
+    preview.textContent=apply.disabled?'修飾キーと通常キーを選んでください。'
+      : [...selected.map(([,name])=>name),key.selectedOptions[0].textContent].join(' + ');
+  }
+  form.onchange=updatePreview;
+  form.onsubmit=event=>{
+    event.preventDefault();
+    if(apply.disabled || !tpScopeMatches(scope)) return;
+    const name=preview.textContent;
+    clearTpEditingContext();
+    setBinding(row.idx,tpShortcutBinding(key.value,selectedModifiers().map(([modifier])=>modifier)));
+    setStatus(`${row.label} に ${name} を割り当てました。`,'s-ok');
+  };
+  form.append(group,key,preview,apply);
+  details.appendChild(form);
+  updatePreview();
+  return details;
+}
 function renderTpActionEditor(row,cfg,bindings){
   const panel=document.getElementById('tp-action-editor');panel.replaceChildren();
   const scope=tpEditScope();
@@ -205,6 +269,7 @@ function renderTpActionEditor(row,cfg,bindings){
   }
   if(row.hold) panel.appendChild(tpNode('p','','長押しはタップと同じ入力を押したままにします。割り当てを変えると、同じ指のタップにも適用されます。'));
   if(row.pinch) panel.appendChild(tpNode('p','','ピンチ中に押す修飾キーを選びます。Ctrl + ホイールは対応アプリで拡大・縮小になります。'));
+  if(!row.pinch) panel.appendChild(renderTpShortcut(row,raw,scope));
   const choices=row.pinch?[['&kp LCTRL','Ctrl'],['&kp LEFT_SHIFT','Shift'],['&kp LALT','Alt'],['&none','修飾キーなし'],['&trans','下位レイヤーから継承']]:[['&mkp LCLK','左クリック'],['&mkp RCLK','右クリック'],['&mkp MCLK','中央クリック'],['&none','割り当てなし'],['&trans','下位レイヤーから継承']];
   const canonical={'&mkp MB1':'&mkp LCLK','&mkp MB2':'&mkp RCLK','&mkp MB3':'&mkp MCLK'}[raw]||raw;
   if(!choices.some(([value])=>value===canonical)) choices.unshift([raw,tpBindingName(raw)]);
@@ -214,7 +279,7 @@ function renderTpActionEditor(row,cfg,bindings){
     radio.onchange=()=>{selected=value;};label.append(radio,tpNode('span','',name));panel.appendChild(label);
   }
   panel.appendChild(tpButton('この操作に割り当て',()=>{if(tpScopeMatches(scope)){clearTpEditingContext();setBinding(row.idx,selected);setStatus(`${tpSideName()} / レイヤー ${state.currentLayer} / ${row.label} の割り当てを変更しました。`,'s-ok');}},'btn primary tp-apply'));
-  panel.appendChild(tpButton('キー・ショートカットを選ぶ',()=>pickTpCustomBinding(row,'basic'),'btn tp-editor-secondary'));
+  panel.appendChild(tpButton('キーパレットを開く',()=>pickTpCustomBinding(row,'basic'),'btn tp-editor-secondary'));
   if(!row.pinch) panel.appendChild(tpButton('マクロを選ぶ',()=>pickTpCustomBinding(row,'macro_pal'),'btn tp-editor-secondary'));
   panel.appendChild(tpNode('p','tp-inactive-bindings','対応するキー割り当てはRPCで反映できます。マクロの定義変更などはファームウェア更新が必要です。'));
   const details=tpNode('details','tp-inactive-bindings');details.append(tpNode('summary','','割り当てコード'),tpNode('code','',raw));panel.appendChild(details);

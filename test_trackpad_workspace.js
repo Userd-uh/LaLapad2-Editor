@@ -9,7 +9,7 @@ const part=(from,to)=>script.slice(script.indexOf(from),script.indexOf(to,script
 let palette;
 const writes=[];
 const ctx={assert,console,markUnsaved(){},renderKeyboard(){},renderTpGestureKeys(){},setStatus(){},
-  bindingLabel:raw=>raw,clearPaletteContext(){},activatePaletteContext:value=>{palette=value;},
+  bindingLabel:raw=>raw.replace(/^&kp /,''),clearPaletteContext(){},activatePaletteContext:value=>{palette=value;},
   needsFollowUpPicker:raw=>raw.includes('XXXXXXXX'),openTemplateFollowUpPicker:value=>{palette=value;},
   DEFAULT_BINDING_CAT_IDS:['basic','macro'],setBinding:(idx,raw)=>writes.push({idx,raw}),
   state:{tpSide:'left',currentLayer:0,tpSelected:'tap1',currentTab:'trackpad',tpView:'actions',macroDefs:[]}};
@@ -45,6 +45,9 @@ vm.runInContext(`
   assert.equal(tpBindingName('&mkp LCLK'),'左クリック');
   assert.equal(tpBindingName('&trans'),'下位レイヤーから継承');
   assert.equal(tpBindingName('&none'),'割り当てなし');
+  const shortcut=tpShortcutBinding('T',['LC','LS']);
+  assert.equal(shortcut,'&kp LC(LS(T))');
+  assert.equal(tpBindingName(shortcut),'Ctrl + Shift + T');
   // Every old settings row has a destination exactly once (no silent losses).
   const settings=tpSettingsSchema('feel').concat(tpSettingsSchema('advanced')).flatMap(s=>s.rows);
   const actionKeys=new Set(tpActionRows('left',modes).flatMap(r=>[r.enableKey,r.modeKey]).filter(Boolean));
