@@ -87,3 +87,11 @@ Static review compared the final diff and data flow with existing positions, con
 Project knowledge capture to Obsidian was not performed because the vault lies outside this session's writable roots; implementation and verification evidence are recorded here.
 
 final result: passed
+
+## 2026-11-24 - Issue #2 annotation and shortcut QA
+
+- Compared the annotated 2529 × 960 trackpad capture with the rendered editor at 1280 × 720. The edited screen includes the application toolbar and was scrolled to the selected three-finger down swipe.
+- The first comparison showed the top of the assignment panel clipped after scrolling to a lower operation. The desktop panel now stays within the operations scroll region and scrolls its own content. The follow-up capture shows the panel heading, current binding, and shortcut entry alongside the selected swipe.
+- Browser interaction confirmed the left/right selector position, the fixed layer controls during operations scrolling, and assignment of Ctrl + Shift + T with the same readable label in the operations list. Device write and Save All were outside this verification.
+
+final result: passed
